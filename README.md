@@ -19,10 +19,10 @@ et permet l'édition et la correction du fichier APN produit.
 LASLA Texts : https://dataverse.uliege.be/dataverse/lasla
 
 Published description of the tagger : 
-*L.A.S.L.A. and Collatinus: a convergence in lexica*
+*L.A.S.L.A. and Collatinus: a convergence in lexica* ;
     Philippe Verkerk,
     Yves Ouvrard,
     Margherita Fantoli,
     Dominique Longrée
-Studi e Saggi Linguistici, V. 58 N. 1 (2020)
+**in** Studi e Saggi Linguistici, V. 58 N. 1 (2020)
 https://www.studiesaggilinguistici.it/index.php/ssl/article/view/275
