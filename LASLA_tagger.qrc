@@ -1,0 +1,21 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource>
+	<file>res/laslalogo.icns</file>
+	<file>res/laslalogo.jpg</file>
+	<file>res/document-new.svg</file>
+	<file>res/document-open.svg</file>
+	<file>res/document-save.svg</file>
+	<file>res/gear.svg</file>
+	<file>res/poignee.svg</file>
+	<file>res/power.svg</file>
+	<file>res/Haut.svg</file>
+	<file>res/Bas.svg</file>
+	<file>res/Droite.svg</file>
+	<file>res/Gauche.svg</file>
+	<file>res/noeud.svg</file>
+	<file>res/couleurs.svg</file>
+	<file>res/edit-find.svg</file>
+	<file>res/zoom.svg</file>
+	<file>res/dezoom.svg</file>
+</qresource>
+</RCC>
