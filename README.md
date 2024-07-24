@@ -9,7 +9,7 @@ is sufficient. I recommend the use of QtCreator.
 This code has been successfully deployed on Mac (OS 10.13.6)
 and Windows 10 and 11. 
 It should work also on Linux, provided that a version
-of Qt is availlable for the target system.
+of Qt is available for the target system.
 
 ## Description
 Ce programme associe une double lemmatisation et
