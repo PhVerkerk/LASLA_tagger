@@ -3,6 +3,14 @@ Code and data for a HMM3 tagger (version 2)
 that transforms plain text files into APN-files 
 (standard annotated files from the LASLA in Liège).
 
+The code is written in C++ using the Qt libraries.
+The free installation of Qt (https://www.qt.io/download-open-source)
+is sufficient. I recommend the use of QtCreator.
+This code has been successfully deployed on Mac (OS 10.13.6)
+and Windows 10 and 11. 
+It should work also on Linux, provided that a version
+of Qt is availlable for the target system.
+
 ## Description
 Ce programme associe une double lemmatisation et
 une désambiguïsation par un modèle de Markov Caché du 3e ordre (HMM3).
