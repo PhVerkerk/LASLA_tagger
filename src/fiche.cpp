@@ -1,5 +1,11 @@
 #include "fiche.h"
 
+#define MAJUSCULES
+// Jusqu'à présent, je laissais les lemmes issus de Collatinus
+// en minuscules, i.e. comme ils devraient être.
+// Pour l'homogénéïté avec les lemmes du LASLA,
+// on m'a demandé de les mettre en majuscules.
+
 /**
  * @brief Fiche::Fiche
  * @param lg : la ligne du fichier.
@@ -28,17 +34,23 @@
  */
 Fiche::Fiche(QString lg)
 {
+    _ligne = lg;
+    // Pour ajouter les genres, je garde la ligne.
     QStringList eclats = lg.split(",");
     _forme = eclats[0];
     _lemme = eclats[1];
     _indice = eclats[2];
     _code = eclats[3];
+//    if (lg.contains("VNKNOWN")) qDebug() << lg << _forme << _lemme;
     if (_code.size() > 9) _code = _code.left(9);
     else while (_code.size() < 9) _code += " ";
+    if ((_code[7] == '4') && !semidep.contains(_lemme)) semidep.append(_lemme);
     _tag = eclats[4];
     if (_tag.size() > 3) _tag = _tag.left(3);
     else while (_tag.size() < 3) _tag += " ";
     _nbr = eclats[5].toInt();
+    if (eclats.size() == 7) _genre = eclats[6];
+    else _genre = " ";
     _jointe = testJointe(_forme);
     // _jointe est true s'il y a un crochet interne.
     _clef = clef(_forme);
@@ -47,6 +59,41 @@ Fiche::Fiche(QString lg)
     else _cmpl = cmpl(_forme,_clef);
     // Si la clef est la forme, il n'y a pas de contrainte.
     // Sinon, il faut voir...
+
+#ifdef MAJUSCULES
+    // Pour mettre un lemme Collatinus en majuscules
+    if (_lemme != _lemme.toUpper())
+    {
+        // Les lemmes LASLA sont déjà en majuscules.
+        if (_lemme[0].isUpper())
+        {
+            // C'est un nom propre ou un adjectif associé.
+            if (_code[0] == "A") _indice = "N";
+            else if (_code[0] == "C") _indice = "A";
+            else _indice = "?";
+            if (_lemme[_lemme.size() - 1].isDigit())
+                _lemme.chop(1);
+        }
+        else
+        {
+            // Y a-t-il un indice ?
+            if (_lemme[_lemme.size() - 1].isDigit())
+            {
+                _indice = _lemme.mid(_lemme.size() - 1, 1);
+                _lemme.chop(1);
+                // Rmq : Dans Collatinus, le premier homonyme n'a pas d'indice.
+            }
+        }
+        _lemme = _lemme.toUpper();
+        _lemme.replace("U","V");
+        _lemme.replace("J","I");
+    }
+#endif
+}
+
+Fiche::~Fiche()
+{
+    // Pas sûr de savoir quoi faire...
 }
 
 /**
@@ -270,8 +317,8 @@ QString Fiche::info()
  */
 QString Fiche::Lasla(QString ref)
 {
-//    if (ref != "/")
-//    qDebug() << ref << _lemme << _indice << _forme << _code;
+//    if (_lemme == "VNKNOWN")
+//    qDebug() << _ligne << _lemme << _indice << _forme << _code;
     QStringList eclats = ref.split("/");
     if (eclats.size() == 1)
     {
@@ -281,11 +328,34 @@ QString Fiche::Lasla(QString ref)
     res += QString(21 - _lemme.size(),' ') + _indice + _forme;
     res += QString(25 - _forme.size(),' ') + eclats[1];
     res += QString(12 - eclats[1].size(),' ') + _code;
-    if (eclats.size() == 3) res += eclats[2];
+    if (eclats.size() == 3)
+    {
+        res += eclats[2];
+        if (eclats[2].size() == 2) res += " ";
+        // Le code de subordination (deux caractères) est suivi,
+        // dans la ligne APN, par une espace.
+    }
     else if (_code.startsWith('B')) res += "** ";
     else res += "   ";
     return res;
 }
+
+QString Fiche::CSV()
+{
+//    QString nombre = "%1";
+    QString res = _forme + "\t" + _tag + "\t";
+    res += _lemme + "\t" + _indice + "\t";
+    res += _code + "\t" + _nombre.arg(_nbr) + "\t" + _clef;
+    // Je ne mets pas de \n à la fin, pour pouvoir y ajouter des infos.
+    return res;
+}
+
+/**
+ * @brief Fiche::_nombre
+ * Une const QString static pour convertir facilement
+ * les nombres en chaine de caractères.
+ */
+const QString Fiche::_nombre = "%1";
 
 /**
  * @brief Fiche::cats
@@ -351,6 +421,9 @@ const QStringList Fiche::tempss = QStringList ()
     << "" << "praes." << "imperf." << "fut." << "perf."
     << "plus-quam-perf." << "fut. ant." << "périphr. parf."
     << "périphr. pqp" << "périphr. fut. ant.";
+
+QStringList Fiche::semidep = QStringList();
+
 
 /**
  * @brief Fiche::humain
@@ -501,4 +574,29 @@ bool Fiche::jointe()
 bool Fiche::estCondit()
 {
     return (_cmpl.contains(" <") || _cmpl.contains("> "));
+}
+
+void Fiche::setGenre(QString genre)
+{
+    _genre = genre;
+}
+
+QString Fiche::getGenre()
+{
+    return _genre;
+}
+
+QString Fiche::getLigne()
+{
+    return _ligne;
+}
+
+bool Fiche::egale(Fiche *fiche)
+{
+    if (_forme != fiche->getForme()) return false;
+    if (_lemme != fiche->getLemme()) return false;
+    if (_indice != fiche->getIndice()) return false;
+    if (_code != fiche->getCode()) return false;
+    if (_clef != fiche->getClef()) return false;
+    return true;
 }

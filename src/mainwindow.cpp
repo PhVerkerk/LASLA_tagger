@@ -1,4 +1,70 @@
 #include "mainwindow.h"
+#include <QDateTime>
+/*
+    QString debut = QDateTime::currentDateTime().toString(Qt::ISODate);
+    qint64 entier_deb = QDateTime::currentMSecsSinceEpoch();
+    QString historic = "historique.txt";
+    // Je crée un fichier avec l'historique dans le dossier courrant.
+    QFile stats(historic);
+    stats.open(QFile::Append|QFile::Text);
+    stats.write(requete.toUtf8());
+    debut.prepend("\nDébut : ");
+    debut.append("\n");
+    stats.write(debut.toUtf8());
+    stats.close();
+
+*/
+
+/**
+ * \file mainwindow.cpp
+ *
+ * \brief Fichier mainwindow.cpp
+ * associé au tagueur LASLA-Collatinus avec une interface graphique.
+ *
+ * Je reprends le travail fait avec le tagueur en daemon
+ * qui doit toujours être installé sur HyperBase-Web.
+ * J'ai aussi changé beaucoup de choses pour utiliser l'IA.
+ * Voir article dans ALMA 2024.
+ *
+ * Idéalement, je voudrais regrouper ici quatre éléments :
+ * - le tagueur à proprement parler qui prend un fichier txt
+ *      et qui produit les APN (et ZPN) comme précédemment
+ *      ainsi qu'un CSV qui sera utilisé par l'IA
+ * - l'appel à l'IA qui se fait, sur PC, par le lancement
+ *      d'un exécutable tiré des scripts Python par PyInstaller
+ * - la réconciliation entre les prédictions de l'IA et
+ *      les possibles proposés par la lemmatisation
+ *      (à la fois par liste de formes et par Collatinus)
+ * - l'édition et la corrections du fichier APN obtenu,
+ *      avec toutes les possibilités qui étaient proposées
+ *      dans les versions précédentes du tagueur.
+ *
+ * Pour le daemon, l'interface avec le monde extérieur se faisait
+ * via le module serveur qui recevait les requêtes
+ * et les faisait traiter par lasla::traite.
+ * En bref, tout se passait dans le module lasla.
+ * Les données ont donc été transférées dans le module lasla
+ * alors qu'elles étaient dans mainwindow pour les tagueurs précédents.
+ *
+ * Une solution bête serait de reconstruire la requête dans
+ * mainwindow (ou de la saisir dans un fenestron ad-hoc)
+ * et de la passer comme si elle venait du serveur.
+ * Cela satisferait la première étape.
+ * Les deuxième et troisième étapes pourraient être traitées de même,
+ * tout se faisant dans des fichiers.
+ * La quatrième étape reste orpheline, ainsi qu'une interaction
+ * avec un philologue pour les formes inconnues.
+ * D'autre part, si je veux pouvoir passer par mainwindow
+ * pour demander de l'aide au philologue, je dois mettre
+ * la classe MainWindow dans la classe Lasla...
+ *
+ */
+
+
+/******************
+ * Classe EditLatin
+ * héritée de Collatinus
+ ******************/
 
 /**
  * \fn EditLatin::EditLatin (QWidget *parent): QTextEdit (parent)
@@ -45,7 +111,10 @@ bool EditLatin::event(QEvent *event)
             bool OK = false;
             int num = mot.section("\t",0,0).toInt(&OK);
             if (!OK)
-                return QWidget::event (event);
+            {
+               // qDebug() << "transfert";
+                return QTextEdit::event (event);
+            }
             QString txtBulle = mainwindow->bulle(num,_ident);
             // Il faudrait voir quelle info donner ! Traduire le code en 9 ?
             if (!txtBulle.isEmpty())
@@ -55,12 +124,14 @@ bool EditLatin::event(QEvent *event)
                 QRect rect(P.x()-20,P.y()-10,40,40); // Je définis un rectangle autour de la position actuelle.
                 QToolTip::setFont(font());
                 QToolTip::showText(helpEvent->globalPos(), txtBulle.trimmed(),
-                                   this, rect, 3000);
+                                   this, rect, 10000);
                 // La bulle disparaît si le curseur sort du rectangle.
             }
+           // qDebug() << "bulle";
             return true;
         }
         default:
+       // qDebug() << "default";
             return QTextEdit::event(event);
     }
 }
@@ -93,6 +164,13 @@ void EditLatin::mouseReleaseEvent(QMouseEvent *e)
     QTextEdit::mouseReleaseEvent(e);
 }
 
+/******************
+ * Fin d' EditLatin
+ *
+ * Classe MainWindow
+ * héritée de Collatinus
+ ******************/
+
 /**
  * @brief MainWindow::MainWindow
  * @param parent
@@ -104,14 +182,32 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent)
 {
     createW();
+    _barre = statusBar();
 
-    statusBar()->showMessage("Chargement en cours...");
-    lireDonnees();
-    statusBar()->clearMessage();
-    _nomFichier = "";
+    _barre->showMessage("Chargement en cours...");
+//    lireDonnees();
+    QString prefixe = qApp->applicationDirPath() + "/data/";
+    dicoPerso = prefixe + "perso.csv";
+    lemPersLa = prefixe + "lem_pers.la";
+    lemPersFr = prefixe + "lem_pers.fr";
+    collat = prefixe + "Collatinus.csv";
+    primoC = true;
+
+//qDebug() << "debut";
+    _lasla = new Lasla(this);
+//qDebug() << "lasla";
+    _barre->clearMessage();
+    _lasla->_nomFichier = "";
     _repertoire = "";
     _numPhrase = 1;
     _numMot = -1;
+    _preProc = false;
+
+    // Pour les fenêtres de dialogue.
+    setDialOuvr();
+//    qDebug() << "dialogues";
+    setDialFiche();
+//    qDebug() << "fiches";
 
 /*    _couleur0 = "gainsboro";
     // Aussi "lightGray", plus foncé, ou "whiteSmoke", plus clair.
@@ -135,8 +231,9 @@ MainWindow::MainWindow(QWidget *parent) :
     tcpSocket->close();
     */
 
+    _changements = false;
 //    _lemCore = new LemCore(this);
-    _lasla = new Lasla(this);
+//    _lasla = new Lasla(this);
 //    _lemCore->setExtension(true);
 //    _lemCore->setCible("k9,fr");
 //    qDebug() << _lemCore->cibles().keys() << _lemCore->cible();
@@ -220,7 +317,8 @@ void MainWindow::readSettings()
 
     settings.endGroup();
     settings.beginGroup("options");
-    int pt = settings.value("zoom").toInt();
+    int pt = settings.value("zoom",12).toInt();
+//    pt = 12;
     _txtEdit->setFontPointSize(pt);
     _chxEdit->setFontPointSize(pt);
     _repertoire = settings.value("repertoire",QDir::homePath()).toString();
@@ -247,6 +345,12 @@ void MainWindow::createW()
 //    _txtEdit->setFont(font);
     createSecond();
 
+    actionPreProc = new QAction(QIcon(":/res/gear.svg"),"PreProc",this);
+    actionPreProc->setObjectName(QStringLiteral("actionPreProc"));
+    actionPreProc->setCheckable(true);
+    actionPreProc->setChecked(false);
+    actionParLot = new QAction(QIcon(":/res/copie.svg"),"Par Lot",this);
+    actionParLot->setObjectName(QStringLiteral("actionParLot"));
     actionNouveau = new QAction(QIcon(":/res/document-new.svg"),"Nouveau",this);
     actionNouveau->setObjectName(QStringLiteral("actionNouveau"));
     actionOuvrir = new QAction(QIcon(":/res/document-open.svg"),"Ouvrir",this);
@@ -304,7 +408,9 @@ void MainWindow::createW()
     mainToolBar = new QToolBar(this);
     mainToolBar->setObjectName(QStringLiteral("mainToolBar"));
     addToolBar(Qt::TopToolBarArea, mainToolBar);
+    mainToolBar->addAction(actionPreProc);
     mainToolBar->addAction(actionNouveau);
+    mainToolBar->addSeparator();
     mainToolBar->addAction(actionOuvrir);
     mainToolBar->addAction(actionSauver);
     mainToolBar->addSeparator();
@@ -326,6 +432,9 @@ void MainWindow::createW()
     menuBar->addAction(menuFichier->menuAction());
     menuBar->addAction(menuPhrase->menuAction());
     menuBar->addAction(menuAide->menuAction());
+    menuFichier->addAction(actionParLot);
+    menuFichier->addAction(actionPreProc);
+    menuFichier->addSeparator();
     menuFichier->addAction(actionNouveau);
     menuFichier->addAction(actionOuvrir);
     menuFichier->addAction(actionSauver);
@@ -344,6 +453,9 @@ void MainWindow::createW()
     menuAide->addAction(actionCouleurs);
     menuAide->addSeparator();
     menuAide->addAction(actionA_propos);
+
+    connect(actionPreProc, SIGNAL(changed()), this, SLOT(preProc()));
+    connect(actionParLot, SIGNAL(triggered()), this, SLOT(parLot()));
 
     connect(actionNouveau, SIGNAL(triggered()), this, SLOT(nouveau()));
     connect(actionOuvrir, SIGNAL(triggered()), this, SLOT(ouvrir()));
@@ -368,10 +480,6 @@ void MainWindow::createW()
 
     setWindowTitle(tr("LASLA_tagger"));
     setWindowIcon(QIcon(":/res/laslalogo.jpg"));
-
-    // Pour les fenêtres de dialogue.
-    setDialOuvr();
-    setDialFiche();
 
 }
 
@@ -419,7 +527,9 @@ void MainWindow::setDialOuvr()
         "</ul></p>.");
 
     dOuvr = new QDialog(this);
-    refOeuvre = new QLineEdit(tr("Ref&1"));
+    refOeuvre = new QLineEdit(tr("Zxz&1"));
+    Medieval = new QCheckBox(tr("Graphies médiévales"));
+    Prose = new QCheckBox(tr("Texte en prose"));
     CR = new QCheckBox(tr("Saut de ligne simple"));
     CR2 = new QCheckBox(tr("Saut de ligne double"));
     CR3 = new QCheckBox(tr("Saut de ligne triple"));
@@ -456,6 +566,8 @@ void MainWindow::setDialOuvr()
     centerLayout->addWidget(nPar,1,1,Qt::AlignLeft);
     centerLayout->addWidget(nCh,2,1,Qt::AlignLeft);
     centerLayout->addWidget(nLvr,3,1,Qt::AlignLeft);
+    centerLayout->addWidget(Medieval,4,0,1,-1,Qt::AlignHCenter);
+    centerLayout->addWidget(Prose,5,0,1,-1,Qt::AlignHCenter);
 
     QVBoxLayout *mainLayout = new QVBoxLayout;
     mainLayout->addLayout(topLayout);
@@ -477,6 +589,9 @@ void MainWindow::setDialOuvr()
  */
 void MainWindow::dialogueOuvr(QString nomF)
 {
+    Medieval->setChecked(_lasla->optionMed());
+    // Nouveau bouton médiéval.
+    Prose->setChecked(_lasla->_prose);
     CR->setChecked(true);
     CR2->setChecked(false);
     CR3->setChecked(false);
@@ -502,21 +617,41 @@ void MainWindow::dialogueOuvr(QString nomF)
  */
 void MainWindow::paramOuvr()
 {
-    _refOeuvre = refOeuvre->text();
-    if (_refOeuvre.contains("&"))
+    QString ref = refOeuvre->text();
+    int dec = 10001; // Valeur par défaut
+    if (ref.contains("&"))
     {
-        _decalPhr = _refOeuvre.section("&",1,1).toInt() + 10000;
-        _refOeuvre = _refOeuvre.section("&",0,0);
+        dec = ref.section("&",1,1).toInt() + 10000;
+        ref = ref.section("&",0,0);
     }
-    else _decalPhr = 10001;
-    if (_refOeuvre.size() > 3) _refOeuvre = _refOeuvre.left(3);
-    else while (_refOeuvre.size() < 3) _refOeuvre += " ";
+    if (ref.size() > 3) ref = ref.left(3);
+    else while (ref.size() < 3) ref += " ";
     // Pour le format APN, la référence de l'œuvre est en 3 caractères.
-    numLg = nLg->text().toInt();
-    numPar = nPar->text().toInt();
-    numCh = nCh->text().toInt();
-    numLvr = nLvr->text().toInt();
-    dOuvr->close();
+    _lasla->_refOeuvre = ref;
+    _lasla->_decalPhr = dec;
+    _lasla->numLg = nLg->text().toInt();
+    _lasla->numPar = nPar->text().toInt();
+    _lasla->numCh = nCh->text().toInt();
+    _lasla->numLvr = nLvr->text().toInt();
+    // Les numéros des premiers ligne, paragraphe, chapitre et livre.
+    // Au maximum trois parmi ces quatre.
+
+    _lasla->formatRef = defFormat();
+    // Définit le format de la référence avec 1, 2 ou 3 champs
+    // Corrige aussi les erreurs 0 et 4 champs
+    // en validant ou dévalidant CR.
+    _lasla->_CR1 = CR->isChecked();
+    _lasla->_CR2 = CR2->isChecked();
+    _lasla->_CR3 = CR3->isChecked();
+    _lasla->_CR4 = CR4->isChecked();
+    _lasla->graphMed(Medieval->isChecked());
+    _lasla->_prose = Prose->isChecked();
+
+    if (dOuvr->isVisible())
+        dOuvr->close();
+    // Dans le cas du traitement d'un lot de fichiers,
+    // je veux intitialiser tous les paramètres avec les mêmes valeurs.
+    // Je vais donc appeler paramOuvr() sans que la fenêtre de dialogue soit ouverte.
 }
 
 void MainWindow::changeCouleurs()
@@ -540,7 +675,7 @@ void MainWindow::defCouleurs()
     // les valeurs par défaut
     _couleur4 = "aquamarine";
     dCoul->close();
-    if (!_finsPhrase.isEmpty())
+    if (!_lasla->_finsPhrase.isEmpty())
         afficher();
 }
 
@@ -553,7 +688,7 @@ void MainWindow::setCouleurs()
     _couleur4 = c4->text();
     // les valeurs choisies
     dCoul->close();
-    if (!_finsPhrase.isEmpty())
+    if (!_lasla->_finsPhrase.isEmpty())
         afficher();
 }
 
@@ -562,6 +697,19 @@ void MainWindow::setCouleurs()
  *
  * Prépare une fenêtre de dialogue pour saisir
  * une nouvelle fiche. Sans l'ouvrir.
+ *
+ * En réalité, prépare des fenêtres de dialogue
+ * pour plusieurs fonctions :
+ * 1) nouvelle fiche
+ * 2) nouveau mot (à ajouter dans le texte)
+ * 3) changement de référence
+ * 4) définition des couleurs
+ * 5) fenêtre pour la recherche
+ *
+ * Chacune sera ensuite remplie par une routine dédiée
+ * puis exécutée avec, par exemple, dFiche->exec().
+ * Les champs importants de chaque dialogue sont des variables globales
+ * et pourront être relus (et traités) par le programme principal.
  *
  */
 void MainWindow::setDialFiche()
@@ -599,6 +747,74 @@ void MainWindow::setDialFiche()
     layout->addWidget(finButton,5,1,Qt::AlignRight);
 
     dFiche->setLayout(layout);
+
+    QLabel *iconC = new QLabel;
+    iconC->setPixmap(QPixmap(":/res/collatinus.jpg").scaled(128,128));
+    QLabel *iconC1 = new QLabel;
+    iconC1->setPixmap(QPixmap(":/res/laslalogo.jpg"));
+    QLabel *cText = new QLabel;
+    cText->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    cText->setWordWrap(true);
+    cText->setText("Nouveau lemme pour Collatinus.");
+    QLabel *cText2 = new QLabel;
+    cText2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    cText2->setWordWrap(true);
+    QString blabla = "Pour définir une nouvelle abréviation, "
+            "il convient d'ajouter un point après la forme "
+                     "et on définit alors une fiche LASLA";
+    cText2->setText(blabla);
+
+    dCollatinus = new QDialog(this);
+    QLabel *cForme = new QLabel("Forme : ");
+    colForme = new QLineEdit();
+    QLabel *cLemme = new QLabel("Lemme : ");
+    colLemme = new QLineEdit();
+    QLabel *cRad1 = new QLabel("Radical 1 : ");
+    QLabel *cIndice = new QLabel("Indice LASLA");
+    colRad1 = new QLineEdit();
+    QLabel *cRad2 = new QLabel("Radical 2 : ");
+    QLabel *cCode = new QLabel("Code en 9");
+    colRad2 = new QLineEdit();
+    QLabel *cIndM = new QLabel("Indic. morph. : ");
+    colIndMorph = new QLineEdit();
+    QLabel *cTrad = new QLabel("Traduction : ");
+    colTrad = new QLineEdit();
+    QLabel *cLien = new QLabel("Lemme LASLA : ");
+    colLien = new QLineEdit();
+    QLabel *cModel = new QLabel("Modèle : ");
+    colModele = new QComboBox();
+//    qDebug() << _lasla->listeModeles();
+    colModele->addItems(_lasla->listeModeles());
+    // Il y a trop de modèles !
+    QPushButton *cfinButton = new QPushButton(tr("Appliquer"));
+    connect(cfinButton, SIGNAL(clicked()), this, SLOT(paramFiche()));
+
+    QGridLayout *clayout = new QGridLayout;
+    clayout->addWidget(iconC,0,0,4,1,Qt::AlignCenter);
+    clayout->addWidget(iconC1,0,3,3,1,Qt::AlignCenter);
+    clayout->addWidget(cText,4,0,Qt::AlignCenter);
+    clayout->addWidget(cText2,5,0,2,1,Qt::AlignLeft);
+    clayout->addWidget(cForme,0,1,Qt::AlignRight);
+    clayout->addWidget(colForme,0,2,Qt::AlignLeft);
+    clayout->addWidget(cLemme,1,1,Qt::AlignRight);
+    clayout->addWidget(colLemme,1,2,Qt::AlignLeft);
+    clayout->addWidget(cModel,2,1,Qt::AlignRight);
+    clayout->addWidget(colModele,2,2,Qt::AlignLeft);
+    clayout->addWidget(cRad1,3,1,Qt::AlignRight);
+    clayout->addWidget(colRad1,3,2,Qt::AlignLeft);
+    clayout->addWidget(cIndice,3,3,Qt::AlignLeft);
+    clayout->addWidget(cRad2,4,1,Qt::AlignRight);
+    clayout->addWidget(colRad2,4,2,Qt::AlignLeft);
+    clayout->addWidget(cCode,4,3,Qt::AlignLeft);
+    clayout->addWidget(cIndM,5,1,Qt::AlignRight);
+    clayout->addWidget(colIndMorph,5,2,Qt::AlignLeft);
+    clayout->addWidget(cTrad,6,1,Qt::AlignRight);
+    clayout->addWidget(colTrad,6,2,Qt::AlignLeft);
+    clayout->addWidget(cLien,5,3,Qt::AlignRight);
+    clayout->addWidget(colLien,6,3,Qt::AlignRight);
+    clayout->addWidget(cfinButton,7,2,Qt::AlignRight);
+
+    dCollatinus->setLayout(clayout);
 
     QLabel *icon2 = new QLabel;
     icon2->setPixmap(QPixmap(":/res/laslalogo.jpg"));
@@ -736,6 +952,7 @@ void MainWindow::setDialFiche()
 void MainWindow::paramFiche()
 {
     dFiche->close();
+    dCollatinus->close();
     dMot->close();
     dRef->close();
     dCoul->close();
@@ -788,7 +1005,8 @@ bool MainWindow::alerte()
 void MainWindow::suivante()
 {
     _numPhrase += 1;
-    if (_numPhrase > _finsPhrase.size()) _numPhrase = _finsPhrase.size();
+    if (_numPhrase > _lasla->_finsPhrase.size())
+        _numPhrase = _lasla->_finsPhrase.size();
     editNumPhr->setText(QString::number(_numPhrase));
     afficher();
 }
@@ -828,7 +1046,7 @@ void MainWindow::debut()
  */
 void MainWindow::fin()
 {
-    _numPhrase = _finsPhrase.size();
+    _numPhrase = _lasla->_finsPhrase.size();
     editNumPhr->setText(QString::number(_numPhrase));
     afficher();
 }
@@ -845,7 +1063,8 @@ void MainWindow::allerA()
 {
     _numPhrase = editNumPhr->text().toInt();
     if (_numPhrase < 1) _numPhrase = 1;
-    if (_numPhrase > _finsPhrase.size()) _numPhrase = _finsPhrase.size();
+    if (_numPhrase > _lasla->_finsPhrase.size())
+        _numPhrase = _lasla->_finsPhrase.size();
     editNumPhr->setText(QString::number(_numPhrase));
     afficher();
 }
@@ -865,13 +1084,13 @@ void MainWindow::afficher()
     QString num = "%1\t";
     int i = 0;
     QString ph = "";
-    if (_elements.isEmpty())
+    if (_lasla->_elements.isEmpty())
     {
         // Chargé à partir d'un APN : pas de ponctuation
-        if (_numPhrase > 1) i = _finsPhrase[_numPhrase - 2];
-        for (; i < _finsPhrase[_numPhrase - 1]; i++)
+        if (_numPhrase > 1) i = _lasla->_finsPhrase[_numPhrase - 2];
+        for (; i < _lasla->_finsPhrase[_numPhrase - 1]; i++)
         {
-            QString m = Mot::courte(_mots[i]->getFLem());
+            QString m = Mot::courte(_lasla->_mots[i]->getFLem());
             if (m.startsWith("<") && m.contains(">"))
                 ph += m.section(">",1) + " ";
             else if (m.endsWith(">") && m.contains("<"))
@@ -881,14 +1100,15 @@ void MainWindow::afficher()
     }
     else
     {
-        if (_numPhrase > 1) i = _fPhrEl[_numPhrase - 2] + 1;
-        for (; i < _fPhrEl[_numPhrase - 1]; i++)
-            ph += _elements[i];
-        QString sep = _elements[_fPhrEl[_numPhrase - 1]];
+        if (_numPhrase > 1) i = _lasla->_fPhrEl[_numPhrase - 2] + 1;
+        for (; i < _lasla->_fPhrEl[_numPhrase - 1]; i++)
+            ph += _lasla->_elements[i];
+        QString sep = _lasla->_elements[_lasla->_fPhrEl[_numPhrase - 1]];
         if (sep.contains(" ")) sep = sep.section(" ",0,0);
         if (sep.contains("\n")) sep = sep.section("\n",0,0);
         ph += sep;
     }
+    // J'ai reconstitué la phrase. Je pourrais le faire dans Lasla.
 //    aff << ph;
 //    aff << "---";
 //    _txtEdit->setText(aff.join("\n"));
@@ -914,8 +1134,8 @@ void MainWindow::afficher()
     cursor.setBlockFormat(backgroundFormat);
     backgroundFormat.setLineHeight(120,QTextBlockFormat::ProportionalHeight);
     i = 0;
-    if (_numPhrase > 1) i = _finsPhrase[_numPhrase - 2];
-    for (; i < _finsPhrase[_numPhrase - 1]; i++)
+    if (_numPhrase > 1) i = _lasla->_finsPhrase[_numPhrase - 2];
+    for (; i < _lasla->_finsPhrase[_numPhrase - 1]; i++)
     {
         if (backgroundFormat.background() == QColor(_couleur1))
             backgroundFormat.setBackground(QColor(_couleur2));
@@ -930,8 +1150,8 @@ void MainWindow::afficher()
         // Je mets en évidence le mot sur lequel on a agi.
         // C'est aussi pour le résultat d'une recherche.
 
-        int choix = _mots[i]->getChoix();
-        cursor.insertText(num.arg(i) + _mots[i]->getInfo(choix,true));
+        int choix = _lasla->_mots[i]->getChoix();
+        cursor.insertText(num.arg(i) + _lasla->_mots[i]->getInfo(choix,true));
     }
 }
 /* Version qui marche, mais qui manque de couleur.
@@ -998,12 +1218,53 @@ QString MainWindow::bulle(int n, int id)
 {
     if (id == 0)
     {
-        if ((n>=0) && (n<_mots.size()))
+        if (_preProc)
+        {
+            // C'est les inconnus
+            if ((n>=0) && (n < _lInc.size()))
+            {
+                QString ligne = _lInc[n].section("\t", 1, 1);
+                // Je mets la phrase en bulle d'aide.
+                QString clef = _lInc[n].section("\t", 0, 0);
+                ligne.replace(clef, "<b>" + clef +"</b>");
+                if (ligne.size() > 80)
+                {
+                    // La ligne est trop longue.
+                    int pos = ligne.indexOf(clef);
+                    if ((pos > 50) && (ligne.size() - pos > 50))
+                    {
+                        // Couper équitablement au début et à la fin.
+                        int espace = ligne.indexOf(" ", pos - 40);
+                        if (espace > 0)
+                            ligne[espace] = '\n';
+                        espace = ligne.indexOf(" ", pos + 30 + clef.size());
+                        if (espace > 0)
+                            ligne[espace] = '\n';
+                    }
+                    if (pos > 70)
+                    {
+                        // Couper au début
+                        int espace = ligne.indexOf(" ", pos - 70);
+                        if (espace > 0)
+                            ligne[espace] = '\n';
+                    }
+                    if (ligne.size() - pos > 70)
+                    {
+                        // Couper à la fin
+                        int espace = ligne.indexOf(" ", pos + 70 +clef.size());
+                        if (espace > 0)
+                            ligne[espace] = '\n';
+                    }
+                }
+                return ligne;
+            }
+        }
+        else if ((n>=0) && (n<_lasla->_mots.size()))
         {
             QStringList res;
-            for (int i=0; i<_mots[n]->cnt();i++)
+            for (int i=0; i<_lasla->_mots[n]->cnt();i++)
             {
-                QString r = _mots[n]->getInfo(i,false);
+                QString r = _lasla->_mots[n]->getInfo(i,false);
                 r.replace("<","&LT;");
                 r.replace(">","&GT;");
                 res << r;
@@ -1017,7 +1278,7 @@ QString MainWindow::bulle(int n, int id)
     }
     else if (n >=0)
     {
-        return _mots[_numMot]->bulle(n); // Il faut trouver quoi répondre.
+        return _lasla->_mots[_numMot]->bulle(n); // Il faut trouver quoi répondre.
     }
     return "";
 }
@@ -1076,12 +1337,229 @@ QString MainWindow::saisie(QString m)
     ligne += c9 + ",";
     ligne += tag(c9) + ",1";
     // J'ai reconstitué une ligne du fichier listForm9.csv
-    QFile fDic(dicoPerso);
+/*    QFile fDic(dicoPerso);
     if (fDic.open(QIODevice::Append|QIODevice::Text))
     {
         ligne.append("\n");
         fDic.write(ligne.toUtf8());
         fDic.close();
+    } */
+    return ligne;
+}
+
+/**
+ * @brief MainWindow::macroniser
+ * @param a la chaîne saisie
+ * @return la chaîne avec des macrons et des breves
+ *
+ * Pour faciliter la saisie des quantités (des syllabes),
+ * j'utilise les touches mortes pour l'accent circonflexe
+ * et pour les trémas avec une voyelle.
+ * Les diphtongues ae et oe sont automatiquement reconnues comme longues.
+ * Par convention, j'associe le macron à l'accent circonflexe
+ * et le breve aux trémas.
+ * Ce choix est lié au clavier français qui a ces deux touches mortes.
+ * Sur un autre type de clavier, il faut peut-être prévoir
+ * le + pour les longues et le - pour les brèves.
+ * Une voyelle sans quantité, hors diphtongue, sera considérée comme commune.
+ * J'aurais aussi pu choisir l'accent grave, mais il est plus difficile d'accès
+ * sur le clavier d'un PC.
+ */
+QString MainWindow::macroniser(QString a)
+{
+    // Un circonflexe pour le macron
+    // et des trémas pour le breve.
+    // diphtongues en deux lettres ou une seule æÆŒœ
+//    qDebug() << a;
+    a.replace("ae","âe");
+    a.replace("Ae","Âe");
+    a.replace("æ","âe");
+    a.replace("Æ","Âe");
+    a.replace("oe","ôe");
+    a.replace("Oe","Ôe");
+    a.replace("œ","ôe");
+    a.replace("Œ","Ôe");
+    // minuscules
+    a.replace("â",QChar(0x0101));
+    a.replace("ä",QChar(0x0103));  // ā ă
+    a.replace("ê",QChar(0x0113));
+    a.replace("ë",QChar(0x0115));  // ē ĕ
+    a.replace("î",QChar(0x012b));
+    a.replace("ï",QChar(0x012d));  // ī ĭ
+    a.replace("ô",QChar(0x014d));
+    a.replace("ö",QChar(0x014f));  // ō ŏ
+    a.replace("û",QChar(0x016b));
+    a.replace("ü",QChar(0x016d));  // ū ŭ
+    a.replace("^y",QChar(0x0233));
+    a.replace("ÿ",QChar(0x045e));  // ȳ ў
+    // majuscule
+    a.replace("Â",QChar(0x0100));
+    a.replace("Ä",QChar(0x0102));  // Ā Ă
+    a.replace("Ê",QChar(0x0112));
+    a.replace("Ë",QChar(0x0114));  // Ē Ĕ
+    a.replace("Î",QChar(0x012a));
+    a.replace("Ï",QChar(0x012c));  // Ī Ĭ
+    a.replace("Ô",QChar(0x014c));
+    a.replace("Ö",QChar(0x014e));  // Ō Ŏ
+    a.replace("Û",QChar(0x016a));
+    a.replace("Ü",QChar(0x016c));  // Ū Ŭ
+    a.replace("^Y",QChar(0x0232));
+    a.replace("¨Y",QChar(0x040e));  // Ȳ Ў
+    // minuscules
+    a.replace("a+",QChar(0x0101));
+    a.replace("a-",QChar(0x0103));  // ā ă
+    a.replace("e+",QChar(0x0113));
+    a.replace("e-",QChar(0x0115));  // ē ĕ
+    a.replace("i+",QChar(0x012b));
+    a.replace("i-",QChar(0x012d));  // ī ĭ
+    a.replace("o+",QChar(0x014d));
+    a.replace("o-",QChar(0x014f));  // ō ŏ
+    a.replace("u+",QChar(0x016b));
+    a.replace("u-",QChar(0x016d));  // ū ŭ
+    a.replace("y+",QChar(0x0233));
+    a.replace("y-",QChar(0x045e));  // ȳ ў
+    // majuscule
+    a.replace("A+",QChar(0x0100));
+    a.replace("A-",QChar(0x0102));  // Ā Ă
+    a.replace("E+",QChar(0x0112));
+    a.replace("E-",QChar(0x0114));  // Ē Ĕ
+    a.replace("I+",QChar(0x012a));
+    a.replace("I-",QChar(0x012c));  // Ī Ĭ
+    a.replace("O+",QChar(0x014c));
+    a.replace("O-",QChar(0x014e));  // Ō Ŏ
+    a.replace("U+",QChar(0x016a));
+    a.replace("U-",QChar(0x016c));  // Ū Ŭ
+    a.replace("Y+",QChar(0x0232));
+    a.replace("Y-",QChar(0x040e));  // Ȳ Ў
+//    qDebug() << a;
+    return a;
+}
+
+/**
+ * @brief MainWindow::saisieCol
+ * @param m : la forme non-trouvée
+ * @return La ligne telle qu'elle serait dans lem_ext.la
+ *
+ * Lorsque le mot donné par le texte n'a pas d'analyse connue,
+ * on interroge Collatinus. Mais si lui aussi échoue,
+ * on demande à l'utilisateur de donner les éléments d'analyse.
+ * La routine initialise les champs de dCollatinus et ouvre cette
+ * fenêtre de dialogue. Après la validation, la routine prend
+ * les divers éléments et recompose une ligne telle qu'elle
+ * doit être dans les fichiers de Collatinus.
+ * Cette ligne est aussi sauvée dans le dico perso.
+ *
+ */
+QString MainWindow::saisieCol(QString m)
+{
+    // En dernier recours, la saisie manuelle.
+    colForme->setText(m);
+    colLemme->clear();
+    colModele->clear();
+    colModele->addItems(_lasla->listeModeles(m));
+    colRad1->clear();
+    colRad2->clear();
+    colIndMorph->clear();
+    colTrad->clear();
+    dCollatinus->exec(); // J'ouvre la fenêtre de dialogue pour créer une fiche
+    QString ligne = colForme->text();
+    if (ligne.contains(".") || (colModele->currentText() == "LASLA"))
+    {
+        // J'ai une abréviation avec un point
+        // ou une forme anomale qui est trop spéciale :
+        // je dois créer une fiche LASLA.
+        if (colLemme->text().isEmpty() && ligne.contains("."))
+            ligne += ",#,";
+        else ligne += "," + colLemme->text() + ",";
+        if (colRad1->text().trimmed().isEmpty())
+        {
+        if (ligne[0].isUpper()) ligne += "N,";
+        else ligne += " ,";
+        }
+        else ligne += colRad1->text().mid(0,1) + ",";
+        if (colRad2->text().trimmed().isEmpty())
+        {
+        if (ligne[0].isUpper()) ligne += "A68      ,A8 ,1";
+        else ligne += "A68      ,A8 ,1";
+        // Je considère que les abréviations sont des noms indéclinables.
+        }
+        else
+        {
+            QString code = colRad2->text().trimmed() + "         ";
+            // J'ajoute beaucoup de blancs à la fin pour couper à 9 caractères
+            ligne += code.mid(0,9) + ",";
+            // Mais je ne fais aucune vérification de la pertinence du code.
+            ligne += _lasla->tag(code.mid(0,9)) + ",1";
+        }
+        // J'ai reconstitué une ligne du fichier listForm9.csv
+/* La sauvegarde dans dico perso est faite lorsque la fiche est ajoutée.
+ * ça se passe dans Lasla::ajouterFiche.
+ *         QFile fDic(dicoPerso);
+        if (fDic.open(QIODevice::Append|QIODevice::Text))
+        {
+            ligne.append("\n");
+            fDic.write(ligne.toUtf8());
+            fDic.close();
+        }
+        */
+    }
+    else
+    {
+        // Entrée pour lem_ext.la jusqu'au Tab. Traduction ensuite.
+        ligne = macroniser(colLemme->text());
+        if (ligne.isEmpty()) return ligne;
+        // Je n'ai pas le droit de laisser un lemme en blanc.
+        QString lemmeCol = Ch::atone(Ch::deramise(ligne.section("=",0,0)));
+        ligne += "|" + colModele->currentText() + "|";
+        ligne += macroniser(colRad1->text()) + "|";
+        ligne += macroniser(colRad2->text()) + "|";
+        ligne += colIndMorph->text() + "|1";
+        QString trad = colTrad->text();
+        if (!trad.isEmpty())
+        {
+            QFile fDic(lemPersFr);
+            if (fDic.open(QIODevice::Append|QIODevice::Text))
+            {
+                if (primoC) fDic.write(_date.toUtf8());
+                trad.prepend(":");
+                trad.prepend(lemmeCol);
+                trad.append("\n");
+                // C'est une ligne de traduction
+                // "lemme:traduction"
+                fDic.write(trad.toUtf8());
+                fDic.close();
+            }
+        }
+        trad = colLien->text();
+        if (!trad.isEmpty())
+        {
+            QFile fDic(collat);
+            if (fDic.open(QIODevice::Append|QIODevice::Text))
+            {
+                if (primoC) fDic.write(_date.toUtf8());
+                trad.prepend(",");
+                trad.prepend(lemmeCol);
+                trad.append("\n");
+                // C'est une ligne d'équivalence
+                // "lemmeCollatinus,lemmeLASLA"
+                fDic.write(trad.toUtf8());
+                fDic.close();
+            }
+        }
+        trad = ligne;
+        QFile fDic(lemPersLa);
+        if (fDic.open(QIODevice::Append|QIODevice::Text))
+        {
+            if (primoC)
+            {
+                fDic.write(_date.toUtf8());
+                primoC = false;
+            }
+            trad.append("\n");
+            fDic.write(trad.toUtf8());
+            fDic.close();
+        }
+        ligne += "\t" + colTrad->text();
     }
     return ligne;
 }
@@ -1109,6 +1587,9 @@ QString MainWindow::defFormat()
     switch (nChamps) {
     case 4:
         CR->setChecked(false); // 3 champs max.
+        formatRef = "%1,%2,%3";
+//        *ref = "1,1,1";
+        break;
     case 3:
         formatRef = "%1,%2,%3";
 //        *ref = "1,1,1";
@@ -1145,14 +1626,14 @@ void MainWindow::rechercher(int i)
     mRech.replace("J","I");
     if (i == -1) i = _numMot + 1;
     bool tourne = true;
-    while ((i < _mots.size()) && tourne)
+    while ((i < _lasla->_mots.size()) && tourne)
     {
-        if (_mots[i]->getFLem().contains(mRech, Qt::CaseSensitive)
-                || _mots[i]->getFTexte().contains(mRech, Qt::CaseSensitive))
+        if (_lasla->_mots[i]->getFLem().contains(mRech, Qt::CaseSensitive)
+                || _lasla->_mots[i]->getFTexte().contains(mRech, Qt::CaseSensitive))
             tourne = false;
         else i++;
     }
-    if (i == _mots.size())
+    if (i == _lasla->_mots.size())
     {
         // J'ai atteint la fin du texte
         QMessageBox attention(QMessageBox::Warning,tr("Fin du texte atteinte !"),tr("Voulez-vous reprendre au début ?"));
@@ -1168,7 +1649,7 @@ void MainWindow::rechercher(int i)
     {
         _numMot = i;
         i = 0;
-        while (_numMot >= _finsPhrase[i]) i++;
+        while (_numMot >= _lasla->_finsPhrase[i]) i++;
         _numPhrase = i + 1;
         editNumPhr->setText(QString::number(_numPhrase));
         afficher();

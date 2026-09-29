@@ -1,0 +1,48 @@
+/*            main_console.cpp
+ *
+ *  This file is part of COLLATINUS.
+ *
+ *  COLLATINUS is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  COLLATINVS is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with COLLATINUS; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * © Yves Ouvrard, 2009 - 2022
+ */
+
+/**
+ * \file main_console.cpp
+ * \brief main
+ * \author Philippe Verkerk
+ * \version 1.1
+ * \date septembre 2022 - mai 2023
+ *
+ * Il s'agit ici du "main" du daemon de Collatinus-web
+ * que je réutilise pour le daemon du tagueur à intégrer à HyperBase.
+ * 
+ */
+
+#include <QtCore>
+
+#include "serveur.h"
+
+/**
+ * \fn main (int argc, char *argv[])
+ * \brief fonction principale de l'application.
+ */
+int main(int argc, char *argv[])
+{
+    fprintf (stdout, "Daemon LASLA_Tagger 1.1\n");
+    QCoreApplication app(argc, argv);
+    Server s;
+    return app.exec();
+}

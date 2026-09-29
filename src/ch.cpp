@@ -52,10 +52,14 @@ void Ch::allonge(QString *f)
     if (f->isEmpty()) return;
     int taille = f->size();
     // Je sais que le morceau à attacher commence par une consonne.
-    if (consonnes.contains(f->at(taille - 1)) &&
-        !QString("\u0101e \u0101u \u0113u \u014de")
+    if ((taille > 1) && consonnes.contains(f->at(taille - 1)) &&
+            (f->at(taille - 2) == QChar(774))) // combining breve
+        f->remove(taille - 2, 1);
+    else if (consonnes.contains(f->at(taille - 1)) &&
+        !QString("\u0101e \u0101u \u0113u \u014de \u0113i")
              .contains(f->mid(taille - 3, 2).toLower()))
-    {
+    { // Il ne faudrait pas allonger la 2e voyelle des diphtongues.
+        // Ajout de la diphtongue "ei" que l'on trouve dans "dein".
         f->replace(QRegExp("[a\u0103]([" + consonnes + "])$"), "\u0101\\1");
         f->replace(QRegExp("[e\u0115]([" + consonnes + "])$"), "\u0113\\1");
         f->replace(QRegExp("[i\u012d]([" + consonnes + "])$"), "\u012b\\1");
@@ -72,10 +76,65 @@ void Ch::allonge(QString *f)
 }
 
 /**
- * \fn Ch:atone(QString a, bool bdc)
+ * \fn Ch::allonge2(QString *f)
+ * \brief modifie f pour que sa dernière voyelle
+ *        devienne longue, même en dernière position.
+ *
+ * Si un mot se terminant avec une voyelle brève est placé devant un mot
+ * qui commence avec deux consonnes (ou plus), sa dernière syllabe doit devenir longue.
+ */
+void Ch::allonge2(QString *f)
+{
+    if (f->isEmpty()) return;
+    int taille = f->size();
+    // Je sais que le morceau à attacher commence par une consonne.
+    if ((taille > 1) && consonnes.contains(f->at(taille - 1)) &&
+            (f->at(taille - 2) == QChar(774))) // combining breve
+        f->remove(taille - 2, 1);
+    else if (consonnes.contains(f->at(taille - 1)) &&
+        !QString("\u0101e \u0101u \u0113u \u014de \u0113i")
+             .contains(f->mid(taille - 3, 2).toLower()))
+    { // Il ne faudrait pas allonger la 2e voyelle des diphtongues.
+        // Ajout de la diphtongue "ei" que l'on trouve dans "dein".
+        f->replace(QRegExp("[a\u0103]([" + consonnes + "])$"), "\u0101\\1");
+        f->replace(QRegExp("[e\u0115]([" + consonnes + "])$"), "\u0113\\1");
+        f->replace(QRegExp("[i\u012d]([" + consonnes + "])$"), "\u012b\\1");
+        f->replace(QRegExp("[o\u014F]([" + consonnes + "])$"), "\u014d\\1");
+        f->replace(QRegExp("[u\u016d]([" + consonnes + "])$"), "\u016b\\1");
+        f->replace(QRegExp("[y\u0233]([" + consonnes + "])$"), "\u045e\\1");
+        f->replace(QRegExp("[A\u0102]([" + consonnes + "])$"), "\u0100\\1");
+        f->replace(QRegExp("[E\u0114]([" + consonnes + "])$"), "\u0112\\1");
+        f->replace(QRegExp("[I\u012c]([" + consonnes + "])$"), "\u012a\\1");
+        f->replace(QRegExp("[O\u014e]([" + consonnes + "])$"), "\u014c\\1");
+        f->replace(QRegExp("[U\u016c]([" + consonnes + "])$"), "\u016a\\1");
+        f->replace(QRegExp("[Y\u0232]([" + consonnes + "])$"), "\u040e\\1");
+    }
+    else if (!QString("\u0101e \u0101u \u0113u \u014de \u0113i")
+             .contains(f->mid(taille - 2, 2).toLower()))
+    { // Il ne faudrait pas allonger la 2e voyelle des diphtongues.
+        // Ajout de la diphtongue "ei" que l'on trouve dans "dein".
+        f->replace(QRegExp("[a\u0103]$"), "\u0101");
+        f->replace(QRegExp("[e\u0115]$"), "\u0113");
+        f->replace(QRegExp("[i\u012d]$"), "\u012b");
+        f->replace(QRegExp("[o\u014F]$"), "\u014d");
+        f->replace(QRegExp("[u\u016d]$"), "\u016b");
+        f->replace(QRegExp("[y\u0233]$"), "\u045e");
+        f->replace(QRegExp("[A\u0102]$"), "\u0100");
+        f->replace(QRegExp("[E\u0114]$"), "\u0112");
+        f->replace(QRegExp("[I\u012c]$"), "\u012a");
+        f->replace(QRegExp("[O\u014e]$"), "\u014c");
+        f->replace(QRegExp("[U\u016c]$"), "\u016a");
+        f->replace(QRegExp("[Y\u0232]$"), "\u040e");
+    }
+}
+
+/**
+ * \fn Ch::atone(QString a, bool bdc)
  * \brief supprime tous les diacritiques de la chaîne a
- *        si bdc est à true, les diacritiques des majuscules
+ * \param a : le mot à traiter
+ * \param bdc : si bdc est à false (par défaut), les diacritiques des majuscules
  *        sont également supprimés.
+ * \return le mot sans diacritique.
  */
 QString Ch::atone(QString a, bool bdc)
 {
@@ -118,7 +177,39 @@ QString Ch::atone(QString a, bool bdc)
 }
 
 /**
- * \fn Ch:communes(QString g)
+ * @brief retourne la voyelle brève
+ * @param c : une voyelle sans quantité en minuscule
+ * @return la fonction retourne la voyelle brève correspondant à c.
+ * Si c n'est pas une voyelle (aeiouy), la fonction retourne c.
+ */
+QChar Ch::breve(QChar c)
+{
+    switch (c.unicode()) {
+    case 97: // 'a'
+        return voyelles[1];
+        break;
+    case 101:
+        return voyelles[3];
+        break;
+    case 105:
+        return voyelles[5];
+        break;
+    case 111:
+        return voyelles[7];
+        break;
+    case 117:
+        return voyelles[9];
+        break;
+    case 121:
+        return voyelles[11];
+        break;
+    default:
+        return c;
+        break;
+    }
+}
+/**
+ * \fn Ch::communes(QString g)
  * \brief note comme communes toutes les voyelles qui ne portent pas de quantité.
  */
 QString Ch::communes(QString g)
@@ -128,9 +219,9 @@ QString Ch::communes(QString g)
     if (g.contains("a") || g.contains("e") || g.contains("i") || g.contains("o") || g.contains("u") || g.contains("y"))
     {
         g.replace("a","ā̆");
-        g.replace(QRegExp("([^āăō])e"),"\\1ē̆");
-        g.replace(QRegExp("^e"),"ē̆");
-        g.replace("i","ī̆");
+        g.replace(QRegExp("([^āăō])e"),"\\1ē̆"); // e qui n'est pas précédé de āăō
+        g.replace(QRegExp("^e"),"ē̆"); // e en début de mot
+        g.replace(QRegExp("([^ē])i"),"\\1ī̆"); // i nu, sauf s'il est dans une diphtongue "ei" (deinde).
         g.replace("o","ō̆");
         g.replace(QRegExp("([^āēq])u"),"\\1ū̆");
         g.replace(QRegExp("^u"),"ū̆");
@@ -143,8 +234,12 @@ QString Ch::communes(QString g)
 
 /**
  * \fn Ch::deQuant(QString *c)
- * \brief utilisée en cas d'élision.
- * supprime la quantité de la voyelle finale de la chaine c
+ * \brief supprime la quantité de la voyelle finale
+ * \param c : le mot
+ * \return le mot sans la quantité de la voyelle finale
+ *
+ * Cette fonction est utilisée en cas d'élision.
+ * Elle supprime la quantité de la voyelle finale de la chaine c
  * lorsque cette voyelle est en fin de mot ou suivie d'un "m".
  */
 void Ch::deQuant(QString *c)
@@ -160,15 +255,33 @@ void Ch::deQuant(QString *c)
 }
 
 /**
- * \fn Ch::deAccent(QString *c)
- * \brief Supprime tous les accents d'un texte (acute, macron, breve)
+ * \brief supprime tous les accents d'un texte
+ * \param c : une chaine (mot ou texte)
+ * \return la chaine sans accent
+ *
+ * Cette fonction est utilisée pour enlever les accents, les diacritiques
+ * (acute, macron, breve, tilde etc...) ou les cédilles d'un texte.
+ * En effet, certains textes (récupérés sur internet) contiennent
+ * des accents ou autres signes diacritiques qui peuvent nuire
+ * à la lemmatisation.
+ * Cette fonction utilise la décomposition normalisée des caractères Unicode
+ * et supprime les signes combinants qui ont été séparés du caractère de base.
+ *
+ * @bug Cette fonction n'est pas utilisée.
+ * Une fonction très similaire existe ailleurs : MainWindow::oteDiacritiques
  */
 QString Ch::deAccent(QString c)
 {
     c = c.normalized(QString::NormalizationForm_D, QChar::currentUnicodeVersion());
-    c.remove("\u0301");
-    c.remove("\u0306");
-    c.remove("\u0304");
+    c.remove("\u0300"); // Accent grave
+    c.remove("\u0301"); // Accent aigu
+    c.remove("\u0302"); // Accent circonflexe
+    c.remove("\u0303"); // Tilde
+    c.remove("\u0304"); // macron
+    c.remove("\u0306"); // breve
+    c.remove("\u0308"); // Trémas
+    c.remove("\u0327"); // Cédille
+    c.remove("\u0328"); // Ogonek
     return c;
 }
 
@@ -176,8 +289,7 @@ QString Ch::deAccent(QString c)
  * \fn QString Ch::deramise(QString r)
  * \brief retourne une graphie non-ramiste
  *        de r, càd dont tous les j deviennent i,
- *        et tous les v deviennent u. Les V majuscules
- *        sont ignorés.
+ *        et tous les v deviennent u.
  */
 QString Ch::deramise(QString r)
 {
@@ -188,6 +300,8 @@ QString Ch::deramise(QString r)
     r.replace("Æ", "Ae");
     r.replace("œ", "oe");
     r.replace("Œ", "Oe");
+    r.replace("ȩ", "ae");
+    r.replace("ę", "ae");
     r.replace(0x1ee5, 'u');  // ụ le u muet de suavis, suadeo, etc...
     r.replace ('V', 'U');
     return r;
@@ -199,6 +313,13 @@ QString Ch::deramise(QString r)
  */
 void Ch::elide(QString *mp)
 {
+    if ((*mp == "\u014d") || (*mp == "ĭō") || (*mp == "hēu") || (*mp == "nē") || (*mp == "ā"))
+        return;
+    // D'après Quicherat (1885, p. 15), les interjections o, heu, io et ne
+    // ne souffrent pas l'élision.
+    // Il mentionne aussi ah et proh, qui sont protégés ici par le h final.
+    // Comme en graphie médiévale, ce h peut tomber, j'ai ajouté ā dans la liste ci-dessus.
+    // Le ā de ab, a, abs n'est pas concerné, car devant une voyelle on met ab.
     //"Tāntāene"
     //bool debog = (*mp == "Tāntāene");
     //if (debog) qDebug() << "tantaene" << *mp;
@@ -212,7 +333,7 @@ void Ch::elide(QString *mp)
         mp->insert(taille - 2, '[');
         mp->append(']');
     }
-    else if (voyelles.contains(mp->at(taille - 1)) && *mp != "\u014d")
+    else if ((taille > 1) && voyelles.contains(mp->at(taille - 1)) && *mp != "\u014d")
     {
         //if (debog) qDebug() << "cond2";
         deQuant(mp);
@@ -222,6 +343,14 @@ void Ch::elide(QString *mp)
     //if (debog) qDebug() << *mp;
 }
 
+/**
+ * @brief sépare la chaine d'entrée en lettres et nombre
+ * @param s : la chaine à découper
+ * @param ch : une chaine passée par adresse qui reçoit les lettres précédant un chiffre
+ * @param n : un entier passée par adresse qui reçoit la valeur numérique finale
+ *
+ * @deprecated Cette fonction semble inusitée...
+ */
 void Ch::genStrNum(const QString s, QString *ch, int *n)
 {
     ch->clear();
@@ -259,7 +388,7 @@ bool Ch::inv_sort_i(const QString &a, const QString &b)
 
 /**
  * \fn Ch::versPC(QString k)
- * \brief Comme versPedeCerto, mais ici le mot n'a pas été trouvé.
+ * \brief Comme Ch::versPedeCerto, mais ici le mot n'a pas été trouvé.
  *        Les voyelles ne sont pas marquées sauf par position...
  */
 QString Ch::versPC(QString k)
@@ -272,6 +401,7 @@ QString Ch::versPC(QString k)
     k.replace("ōe", "+");
     k.replace("āu", "+");
     k.replace("ēu", "+");
+    k.replace("ēi", "+");
     // Incomplet : manque la recherche de doubles consonnes ou voyelles
     k.replace("a", "*");
     k.replace("e", "*");
@@ -284,8 +414,8 @@ QString Ch::versPC(QString k)
 
 /**
  * \fn Ch::versPedeCerto(QString k)
- * \brief remplace les longues de k par +, les brèves par - et les communes par
- * *
+ * \brief remplace les longues de k par +, les brèves par - et les communes par *
+ *
  */
 QString Ch::versPedeCerto(QString k)
 {
@@ -325,6 +455,17 @@ QString Ch::versPedeCerto(QString k)
     return k;
 }
 
+/**
+ * @brief transforme les quantités en + et - en conservant les voyelles
+ * @param k : la chaine à transformer
+ * @return la chaine transformée
+ *
+ * Cette fonction transforme les quantités indiquées avec macron ou breve
+ * par les signes + et -, tout en conservant la voyelle.
+ * Une "*" pour les voyelles communes.
+ * Elle est utilisée pour accentuer un mot, dans Ch::ajoutSuff.
+ *
+ */
 QString Ch::transforme(QString k)
 {
     k.replace("āe", "æ+");
@@ -332,6 +473,7 @@ QString Ch::transforme(QString k)
     k.replace("ăe", "æ-");
     k.replace("Āe", "Æ+");
     k.replace("Ōe", "Œ+");
+    k.replace("ēi", "\u0117+"); // La diphtongue "ei" dans dein et deinde.
     // Je remplace les longues par +, les brèves par - et les communes par *
     // minuscules
     k.replace(0x0101, "a+");
@@ -365,6 +507,15 @@ QString Ch::transforme(QString k)
     return k;
 }
 
+/**
+ * @brief accentue la voyelle
+ * @param l : une voyelle ou une diphtongue
+ * @return la voyelle ou la diphtongue accentuée
+ *
+ * Cette fonction place un accent aigu sur la voyelle donnée en argument.
+ * Si l'argument n'est pas une voyelle, il ne se passe rien.
+ * Cette fonction est utilisée pour accentuer un mot, dans Ch::ajoutSuff.
+ */
 QString Ch::accentue(QString l)
 {
     if ((l == "œ") || (l == "Œ")) return l + "\u0301";
@@ -404,6 +555,34 @@ QString Ch::accentue(QString l)
     }
 }
 
+/**
+ * @brief ajoute le suffixe à la forme
+ * @param fq : la forme avec ses quantités
+ * @param suffixe : le suffixe avec ses quantités
+ * @param l_etym : l'information étymologique
+ * @param accent : un entier qui dit s'il faut scander ou accentuer
+ * @return la forme avec son suffixe, scandée ou accentuée
+ *
+ * Lors de la lemmatisation, un éventuel enclitique a été séparée de la forme.
+ * Il faut donc le recoller à la fin.
+ * Toutefois, si la forme se termine par une consonne, on se retrouve avec
+ * deux consonnes de suite et la syllabe devient nécessairement longue.
+ * @note uirumque devient transitoirement vĭrŭm + quĕ, ce qui donne vĭrūmquĕ.
+ *
+ * Si le paramètre _accent_ est nul, on procède à une scansion.
+ * Sinon, l'ensemble sera accentué et _accent_ spécifie le comportement
+ * dans le cas des voyelles communes (voir Scandeur::scandeTxt pour les détails).
+ *
+ * Ce même paramètre _accent_ permet de séparer les syllabes.
+ * Il faut alors faire attention aux éventuels préfixes
+ * qui conduisent à des exceptions dans le découpage.
+ * Ces exceptions sont indiquées dans *l_etym*.
+ * voir LemCore::lireHyphen pour quelques détails.
+ *
+ * @note L'enclitique attire l'accent.
+ * Le mot _rosaque_ sera paroxyton, _rosáque_ même au nominatif (où le _a_ est bref).
+ *
+ */
 QString Ch::ajoutSuff(QString fq, QString suffixe, QString l_etym, int accent)
 {
     bool illius = false;

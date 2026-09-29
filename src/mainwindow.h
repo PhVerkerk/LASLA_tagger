@@ -12,6 +12,7 @@
 #include "mot.h"
 #include "lasla.h"
 #include "lemCore.h"
+#include "ch.h"
 
 namespace Ui {
 class MainWindow;
@@ -48,6 +49,8 @@ public:
 private:
     QAction *quitAct;
     QAction *actionNouveau;
+    QAction *actionParLot;
+    QAction *actionPreProc;
     QAction *actionOuvrir;
     QAction *actionSauver;
     QAction *actionA_propos;
@@ -75,15 +78,17 @@ private:
     QWidget *_second;
 //    QTextEdit *_txtEdit;
     QLineEdit *editNumPhr;
-//    QStatusBar *statusBar;
+    QStatusBar *_barre;
 
     // Pour compléter le format APN.
     QLineEdit *refOeuvre;
+    QCheckBox *Medieval;
+    QCheckBox *Prose;
     QCheckBox *CR;
     QCheckBox *CR2;
     QCheckBox *CR3;
     QCheckBox *CR4;
-    QString _refOeuvre;
+//    QString _refOeuvre;
     QString _nomFichier;
     QString _repertoire;
     void dialogueOuvr(QString nomF);
@@ -91,11 +96,12 @@ private:
     void setDialOuvr();
     void afficher();
     QString saisie(QString m);
-    int _decalPhr; // Pour donner un numéro autre que 1 à la 1ère phrase.
+    QString saisieCol(QString m);
+/*    int _decalPhr; // Pour donner un numéro autre que 1 à la 1ère phrase.
     int numLg;
     int numPar;
     int numCh;
-    int numLvr;
+    int numLvr;*/
     QLineEdit *nLg;
     QLineEdit *nPar;
     QLineEdit *nCh;
@@ -119,6 +125,17 @@ private:
     QLineEdit *ficCode9;
     void setDialFiche();
     QDialog *dFiche;
+    // Plutôt que de faire une fiche LASLA,
+    // créer un nouveau lemme pour Collatinus.
+    QLineEdit *colForme;
+    QLineEdit *colLemme;
+    QLineEdit *colRad1;
+    QLineEdit *colRad2;
+    QLineEdit *colIndMorph;
+    QLineEdit *colTrad;
+    QLineEdit *colLien;
+    QComboBox *colModele;
+    QDialog *dCollatinus;
     QDialog *dMot;
     QLineEdit *ficForme2;
     QDialog *dRef;
@@ -132,28 +149,33 @@ private:
     void readSettings();
     bool estRomain(QString r);
     QRegExp const chiffres = QRegExp("[0-9]");
-    void taggage();
-    double retag(QString *bitag, int iFixe);
+//    void taggage();
+//    double retag(QString *bitag, int iFixe);
 
 //    LemCore *_lemCore; // Je dois créer un LemCore pour charger l'extension.
     Lasla *_lasla;
-    QList<Fiche*> appelCollatinus(QString m, bool *enclit);
-    QList<Fiche*> _analyses; // Je crée une variable globale avec les analyses.
+//    QList<Fiche*> appelCollatinus(QString m, bool *enclit);
+//    QList<Fiche*> _analyses; // Je crée une variable globale avec les analyses.
 
     QString _texte; // Le texte chargé
     int _numPhrase; // Le numéro de la phrase à afficher.
     int _numMot; // Le numéro du mot pour lequel on veut choisir la bonne lemmatisation.
-    QStringList _elements; // Le texte découpé : les éléments pairs sont les séparateurs
-    QList<Mot*> _mots; // Les mots du texte analysés.
+//    QStringList _elements; // Le texte découpé : les éléments pairs sont les séparateurs
+//    QList<Mot*> _mots; // Les mots du texte analysés.
 //    int _rang;
-    QList<int> _finsPhrase; // Le rang du dernier mot de la phrase dans _mots.
-    QList<int> _fPhrEl; // Le rang du dernier mot de la phrase dans _elements.
-    QList<int> _pointsFixes; // Les indices des mots qui sont des points fixes (un seul bitag possible).
+//    QList<int> _finsPhrase; // Le rang du dernier mot de la phrase dans _mots.
+//    QList<int> _fPhrEl; // Le rang du dernier mot de la phrase dans _elements.
+//    QList<int> _pointsFixes; // Les indices des mots qui sont des points fixes (un seul bitag possible).
     bool _changements;
     bool static plusFreq(Fiche *f1, Fiche *f2);
     bool alerte();
     QString tag(QString code9);
     QString dicoPerso;
+    QString lemPersLa;
+    QString lemPersFr;
+    QString collat;
+    bool primoC;
+    QString _date;
 
     // Création des mots correspondant aux enclitiques
     // Il est inutile d'aller chercher les enclitiques à chaque fois qu'ils sortent...
@@ -170,26 +192,32 @@ private:
     QMap<QString,qint64> _monogrammes;
     QMap<QString,QString> _corresp;
 
-    void lireDonnees();
+//    void lireDonnees();
     QString defFormat();
-    void grec();
+//    void grec();
 
 //    QMap<QChar,int> _cntCar;
-    void cntChar(QString f);
+//    void cntChar(QString f);
 
     void creerNvlFiche();
     void couperMot();
-    void decimer(int i, int debPhr, int finPhr);
-    void ajouterMot(QString m, int nm, QString r);
+//    void decimer(int i, int debPhr, int finPhr);
+//    void ajouterMot(QString m, int nm, QString r);
     void ajouterMotAvant();
     void ajouterMotApres();
     void supprMot();
     void separeEncli();
     void changerRef();
-    QList<Fiche*> getAnalyses(QString forme);
+
+    bool _preProc;
+    QStringList _lInc; // Liste des formes inconnues à traiter.
+    void afficheInc();
+    QString macroniser(QString a);
 
 private slots:
     void closeEvent(QCloseEvent *event);
+    void parLot();
+    void preProc();
     void nouveau();
     void ouvrir();
     void sauver(QString nomFichier = "");

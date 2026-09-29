@@ -1,7 +1,8 @@
 #ifndef MOT_H
 #define MOT_H
 
-#include <QtWidgets>
+// #include <QtWidgets>
+#include <QDebug>
 #include <QString>
 #include <QStringList>
 #include <QList>
@@ -11,8 +12,9 @@ class Mot
 {
 public:
     Mot(QString ft, QString fl, QList<Fiche*> lf, int rg = -1, QString refs = "");
+    ~Mot(); // Destructeur ?
     void ajoute (QString t);
-    void setChoix (QString t, int sc); // Pour choisir un tag.
+    void setChoix (QString t, double sc); // Pour choisir un tag.
     void setChoix(int n); // Pour changer le choix à la main.
     int getChoix ();
     int getScore ();
@@ -31,8 +33,10 @@ public:
     void designe(QString f, QString l, QString ind, QString c);
     QList<Fiche*> listeFiches ();
     void setFTexte(QString t);
+    void setFLem(QString t);
     QString getInfo(int nFiche, bool complet = true);
     QString Lasla(QString ref);
+    QString CSV(QString ref);
     void ajouteFiche(Fiche *f);
     void ajouteFiches(QList<Fiche*> lf);
     QString bulle(int n);
@@ -49,9 +53,30 @@ public:
     double getBest(int n);
     double getBest(QString t);
 
+    // Pour essayer de grouper auxiliaire et participe
+    bool estAux();
+    bool estPart();
+    int existe(QString ligne);
+
+    void setNotNormal();
+    bool getNormal();
+    void setApres(QString separateur);
+    QString getApres();
+    void setAItag(QString tag);
+    void setAIind(QString ind);
+    void setAIsub(QString sub);
+    QString getAIresults();
+    QString getPossible();
+
+    void setFcsv(QString forme);
+    QString getFcsv();
+    void setAlerte(QString w);
+    QString getAlerte();
+
 private:
     QString _fTexte;
     QString _fLem;
+    QString _fCSV; // La forme que j'écris dans le CSV pour l'IA
     QString _refs;
     int _rang;
     QList<Fiche*> _lFiches;
@@ -59,8 +84,19 @@ private:
     QList<int> _lNbr;
     QList<double> _lBestProbas;
     QString _tagChoisi;
-    int _score;
+    double _score;
     int _choix;
+
+    QString _apres;
+    bool _normal;
+
+    // Pour ajouter les prédictions de l'IA.
+    QString _tagAI;
+    QString _indAI;
+    QString _subAI;
+    QString _alerte;
+
+    static const QString nombre;
 };
 
 #endif // MOT_H

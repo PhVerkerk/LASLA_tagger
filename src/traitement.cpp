@@ -7,7 +7,7 @@
 * Il complète le fichier "mainwindow.cpp" qui
 * contient les routines de gestion des fenêtres.
 **/
-
+/*
 void MainWindow::lireDonnees()
 {
     QString prefixe = qApp->applicationDirPath() + "/data/";
@@ -171,43 +171,324 @@ void MainWindow::lireDonnees()
     fListe.close();
     _changements = false;
 }
-/*
+
 void MainWindow::cntChar(QString f)
 {
     for (int i=0;i<f.size();i++) _cntCar[f[i]]++;
 }
 */
+
+/**
+ * @brief MainWindow::preProc
+ * Un passage de pré-processing pour repérer les mots non-reconnus
+ * et introduire les lemmes correspondants dans Collatinus.
+ */
+void MainWindow::preProc()
+{
+    if (actionPreProc->isChecked())
+    {
+        _preProc = true;
+        _lasla->setPreProc(true);
+        _txtEdit->setText("Mode de pré-traitement (préPocessing)\n"
+                          "Les formes inconnues sont repérées\n"
+                          "sans que le résultat de la lemmatisation ne soit sauvé.");
+        // Je voudrais changer l'aspect de quelque chose pour que l'on sache que l'on est en préprocessing.
+//        mainToolBar->setBackgroundRole();
+    }
+    else
+    {
+        // Il faudrait sauver le travail fait ?
+        _txtEdit->clear();
+        _preProc = false;
+        _lasla->setPreProc(false);
+    }
+//    nouveau();
+}
+
+void MainWindow::afficheInc()
+{
+    _lInc = _lasla->inconnus();
+    //_txtEdit->setText(lInc.join("\n"));
+    // Juste pour afficher.
+    QString num = "%1\t";
+    QString ph = "Mode de pré-traitement (préPocessing)\n"
+                 "Les formes inconnues sont repérées\n"
+                 "sans que le résultat de la lemmatisation ne soit sauvé.";
+    _txtEdit->clear();
+    QTextCursor cursor(_txtEdit->textCursor());
+    QTextBlockFormat backgroundFormat = cursor.blockFormat();
+    QTextBlockFormat choixFormat = backgroundFormat;
+    choixFormat.setBackground(QColor(_couleur3));
+    choixFormat.setLineHeight(120,QTextBlockFormat::ProportionalHeight);
+    backgroundFormat.setBackground(QColor(_couleur0));
+    // Aussi "silver", plus foncé, ou "gainsboro", plus clair.
+    QTextBlockFormat fixeFormat = backgroundFormat;
+    fixeFormat.setBackground(QColor(_couleur4));
+    fixeFormat.setLineHeight(120,QTextBlockFormat::ProportionalHeight);
+
+    cursor.setBlockFormat(backgroundFormat);
+    cursor.insertText(ph);
+    // J'ai écrit la phrase. Je la voudrais sur fond gris clair.
+    backgroundFormat.setBackground(QColor("white"));
+    cursor.insertBlock(); // Une ligne blanche vide.
+    cursor.setBlockFormat(backgroundFormat);
+
+    backgroundFormat.setLineHeight(120,QTextBlockFormat::ProportionalHeight);
+    for (int i = 0; i < _lInc.size(); i++)
+    {
+        if (backgroundFormat.background() == QColor(_couleur1))
+            backgroundFormat.setBackground(QColor(_couleur2));
+        else backgroundFormat.setBackground(QColor(_couleur1));
+        // J'alterne les lignes blanches et bleues.
+        cursor.insertBlock();
+        cursor.setBlockFormat(backgroundFormat);
+        cursor.insertText(num.arg(i) + _lInc[i].section("\t", 0, 0));
+    }
+}
+
+/**
+ * @brief MainWindow::parLot
+ * Comme Nouveau, mais pour un lot de fichiers.
+ *
+ * Contrairement à Nouveau qui ne charge et traite qu'un seul fichier texte,
+ * on peut ici en ouvrir une série.
+ * Ils sont alors traités successivement sans validation des diverses étapes.
+ * Les fichiers obtenus sont sauvés sur le disque,
+ * mais ne sont pas ouverts dans l'éditeur (qui n'est pas encore opérationnel).
+ */
+void MainWindow::parLot()
+{
+    // Comme Nouveau, mais pour un lot de fichiers. Se termine avec la création des fichiers APN.
+    QStringList nomsFichier =
+            QFileDialog::getOpenFileNames(this, "Lire le fichier",_repertoire,"Text files (*.txt)");
+
+    QProcess *proc = new QProcess(this);
+    proc->setWorkingDirectory(qApp->applicationDirPath());
+    proc->setProcessChannelMode(QProcess::MergedChannels);
+    bool surPC = true;
+#ifdef Q_OS_MAC
+    surPC = false;
+    // Pour ne pas appeler simple_pred et CSV2APN.
+#endif
+
+    if (!nomsFichier.isEmpty())
+    {
+        dialogueOuvr(nomsFichier.at(0));
+        // Pour définir la référence de l'œuvre et le mode de référencement
+        // Ainsi qu'un éventuel décalage des numéros de phrase, ligne, etc...
+    }
+    foreach(QString nomFichier, nomsFichier)
+    {
+        _lasla->_nomFichier = nomFichier;
+        paramOuvr();
+
+        QFile f(nomFichier);
+        if (f.open(QFile::ReadOnly)) _lasla->_texte = f.readAll();
+        f.close();
+
+        QFileInfo info = QFileInfo(nomFichier);
+        _repertoire = info.canonicalPath();
+        _nomFichier = info.baseName();
+        // Nom du fichier, sans l'extension qui devrait être txt.
+
+        QString rep = _lasla->nouveau();
+        if (!_preProc && surPC)
+        {
+            // Je peux maintenant appeler simple_pred...
+            QFile fic("fichiers.txt");
+            if (fic.open(QFile::WriteOnly | QFile::Text))
+            {
+                QString toto = nomFichier;
+                toto.replace(".txt",".csv");
+                fic.write(toto.toUtf8());
+                fic.close();
+
+                proc->start("simple_pred.exe");
+                proc->waitForFinished(-1);
+                QString blabla = proc->readAll();
+
+             /* Pour l'instant, j'appelle CSV2APN comme process externe.
+             * C'est assez absurde, car toutes les données sont
+             * en mémoire et il est idiot d'aller les relire.
+             * Toutefois, comme le programme existait,
+             * il m'a suffi de le copier au bon endroit...
+             *
+             * À terme, il faudra que je fasse la réconciliation
+             * in situ et que je fasse fonctionner l'éditeur
+             * directement sur les données en mémoire.
+             * */
+                proc->start("CSV2APN.exe");
+                proc->waitForFinished(-1);
+                blabla = proc->readAll();
+
+                toto.replace(".csv","_W.txt");
+                fic.setFileName(toto);
+                if (fic.open(QFile::WriteOnly | QFile::Text))
+                {
+                    fic.write(blabla.toUtf8());
+                    fic.close();
+                }
+                // J'ai pu écrire le fichier "fichiers.txt"
+                // et j'ai traité ledit fichier par simple_pred et CSV2APN.
+            }
+            // En mode "préProcessing", je ne fais que la lemmatisation
+            // de tous les fichiers du lot sans sauver les résultats.
+            // L'affichage et l'édition des formes inconnues se fait à la fin
+            // un peu plus bas.
+        }
+
+    }
+    // Fin de la boucle sur les fichiers.
+    delete proc;
+    if (_preProc) afficheInc();
+    // Affichage des formes inconnues récoltées.
+}
+
 /**
  * @brief MainWindow:nouveau
  * Ouvre un nouveau fichier texte et lemmatise l'ensemble des mots.
+ *
  * Doit aussi sauver un fichier XML pour conserver l'état intermédiaire.
  */
 void MainWindow::nouveau()
 {
+    // Je prépare la date et le nouveau pour mettre un séparateur dans les fichiers.
     bool lire = true;
     if (_changements) lire = alerte();
     if (lire)
     {
-        statusBar()->showMessage("Chargement du texte et lemmatisation...");
+        _barre->showMessage("Chargement du texte et lemmatisation...");
         QString nomFichier =
                 QFileDialog::getOpenFileName(this, "Lire le fichier",_repertoire,"Text files (*.txt)");
         if (!nomFichier.isEmpty())
         {
+            _lasla->_nomFichier = nomFichier;
+            _date = "!" + QDateTime::currentDateTime().toString(Qt::ISODate) + "\n! ";
+            _date.append(nomFichier + "\n");
+            _lasla->setDate(_date);
+            primoC = true;
+
             QFile f(nomFichier);
-            if (f.open(QFile::ReadOnly)) _texte = f.readAll();
+            if (f.open(QFile::ReadOnly)) _lasla->_texte = QString::fromUtf8(f.readAll());
             f.close();
-        }
-        if (!_texte.isEmpty())
-        {
-            _changements = true; // Pour ne pas perdre mon travail !
+
+            _changements = false; // j'appelle lasla->nouveau()
+            // qui sauve directement le résultat du traitement.
+            // _changements deviendra true si je modifie les propositions du traitement automatique.
+//            _changements = true; // Pour ne pas perdre mon travail !
             QFileInfo info = QFileInfo(nomFichier);
             _repertoire = info.canonicalPath();
             _nomFichier = info.baseName();
             // Nom du fichier, sans l'extension qui devrait être txt.
 
-            dialogueOuvr(nomFichier);
+            if (!_preProc)
+                dialogueOuvr(nomFichier);
             // Pour définir la référence de l'œuvre et le mode de référencement
             // Ainsi qu'un éventuel décalage des numéros de phrase, ligne, etc...
+
+            QString rep = _lasla->nouveau();
+            _barre->clearMessage();
+//            qDebug() << _preProc;
+            if (_preProc)
+            {
+                afficheInc();
+                // J'affiche les formes inconnues et je m'arrête.
+                return;
+            }
+            QMessageBox::about(
+                this, _nomFichier,
+                rep);
+#ifdef Q_OS_MAC
+            return;
+#endif
+            // Je peux maintenant appeler simpl_pred...
+//            QString repAI = "C:/Users/PhVer/Documents/Latin/latin-bert-master/LASLA";
+            QFile fic("fichiers.txt");
+            if (fic.open(QFile::WriteOnly | QFile::Text))
+            {
+                QString toto = nomFichier;
+                toto.replace(".txt",".csv");
+                fic.write(toto.toUtf8());
+                fic.close();
+
+                _barre->showMessage("Traitement par l'AI...");
+                QProcess *proc = new QProcess(this);
+                proc->setWorkingDirectory(qApp->applicationDirPath());
+                proc->setProcessChannelMode(QProcess::MergedChannels);
+                proc->start("simple_pred.exe");
+                proc->waitForFinished(-1);
+                QString blabla = proc->readAll();
+                QMessageBox::about(
+                    this, "AI",
+                    blabla);
+                if (proc->exitCode())
+                {
+                    rep = QString::number(proc->exitCode());
+                    QMessageBox::about(
+                        this, "Erreur",
+                        rep);
+                }
+//                delete proc;
+
+                _barre->showMessage("Traitement final...");
+                /* Pour l'instant, j'appelle CSV2APN comme process externe.
+                 * C'est assez absurde, car toutes les données sont
+                 * en mémoire et il est idiot d'aller les relire.
+                 * Toutefois, comme le programme existait,
+                 * il m'a suffi de le copier au bon endroit...
+                 *
+                 * À terme, il faudra que je fasse la réconciliation
+                 * in situ et que je fasse fonctionner l'éditeur
+                 * directement sur les données en mémoire.
+                 * */
+//                QProcess *proc2 = new QProcess(this);
+//                proc2->setWorkingDirectory(qApp->applicationDirPath());
+//                proc2->setProcessChannelMode(QProcess::MergedChannels);
+                proc->start("CSV2APN.exe");
+                proc->waitForFinished(-1);
+                blabla = proc->readAll();
+                QString msg = "%1 warnings :\n * %2 tags et indices\n * %3 indices.";
+                QMessageBox::about(
+                    this, "csv2apn",
+                    msg.arg(blabla.count("inconnu")).arg(blabla.count("Tag")).arg(blabla.count("Indice")));
+
+                toto.replace(".csv","_W.txt");
+                fic.setFileName(toto);
+                if (fic.open(QFile::WriteOnly | QFile::Text))
+                {
+                    fic.write(blabla.toUtf8());
+                    fic.close();
+                }
+
+                if (proc->exitCode())
+                {
+                    rep = QString::number(proc->exitCode());
+                    QMessageBox::about(
+                        this, "Erreur",
+                        rep);
+                }
+                delete proc;
+                _barre->clearMessage();
+
+            }
+            QString toto = nomFichier;
+            toto.replace(".txt",".csv");
+            QString w = _lasla->CSV2APN(toto);
+            toto.replace(".csv","_new.APN");
+            _lasla->sauver(toto);
+            toto.replace("_new.APN","_Wnew.txt");
+            fic.setFileName(toto);
+            if (fic.open(QFile::WriteOnly | QFile::Text))
+            {
+                fic.write(w.toUtf8());
+                fic.close();
+            }
+
+            debut();
+
+        }
+/*        if (!_texte.isEmpty())
+        {
 //            QList<Fiche*> analyses;
             QList<Fiche*> analyses_C;
             Mot * mot;
@@ -263,7 +544,7 @@ void MainWindow::nouveau()
                 }
                 QString np = QString::number(_finsPhrase.size() + _decalPhr);
                 np[0] = '&'; // Par défaut. Je ne gère pas les '#' et '+'.
-                refO = _refOeuvre.mid(0,3) + np + "/" + ref;
+                refO = _lasla->_refOeuvre.mid(0,3) + np + "/" + ref;
 
                 QString m = _elements.at(i); // les mots dans l'ordre.
                 _analyses.clear();
@@ -692,7 +973,7 @@ void MainWindow::nouveau()
             debut();
         } // Fin du traitement d'un texte non-vide.
         else _txtEdit->setText("Texte vide !");
-        statusBar()->clearMessage();
+        statusBar()->clearMessage();*/
     } // Fin de la lecture
 }
 
@@ -723,12 +1004,14 @@ void MainWindow::ouvrir()
     if (_changements) lire = alerte();
     if (lire)
     {
-        statusBar()->showMessage("Récupération du travail en cours...");
+        _barre->showMessage("Récupération du travail en cours...");
         QString nomFichier =
-                QFileDialog::getOpenFileName(this, "Lire le fichier",_repertoire,"APN files (*.APN)");
+                QFileDialog::getOpenFileName(this, "Lire le fichier",_repertoire,
+                                             "ZPN files (*.ZPN) ;; APN files (*.APN)");
         if (!nomFichier.isEmpty())
         {
-            _mots.clear();
+/* Déplacé dans Lasla...
+ *             _mots.clear();
             _elements.clear();
             _finsPhrase.clear();
             _changements = false;
@@ -786,7 +1069,7 @@ void MainWindow::ouvrir()
                 Il semblerait que + et ? soient des erreurs et que l'on peut les ignorer.
                 linea est la ligne que je suis en train de traiter
                 ligne est la ligne qui suit.
-                */
+                ////
                 if (car8 != linea[7])
                 {
                     // Je commence une nouvelle phrase;
@@ -922,28 +1205,56 @@ void MainWindow::ouvrir()
                 for (int i = deb; i < _finsPhrase[iPhrase];i++)
                     decimer(i,deb,_finsPhrase[iPhrase]);
                 deb = _finsPhrase[iPhrase];
-            }
-            debut();
+            } */
+            QFileInfo info = QFileInfo(nomFichier);
+            _repertoire = info.canonicalPath();
+            _nomFichier = info.baseName(); // Nom du fichier, sans l'extension qui devrait être APN.
+            _changements = false;
+            if (_lasla->ouvrir(nomFichier)) debut();
+            else _txtEdit->setText("Fichier vide !");
         }
-        else _txtEdit->setText("Fichier vide !");
-        statusBar()->clearMessage();
+        _barre->clearMessage();
     }
 }
 
 /**
  * @brief MainWindow::sauver
  * Pour sauver le résultat au format APN.
- * Sauve aussi un fichier intermédiaire au format XML avec tous les choix possibles.
+ * Sauve aussi un fichier intermédiaire au format ZPN avec tous les choix possibles.
  */
 void MainWindow::sauver(QString nomFichier)
 {
+    if (_preProc)
+    {
+        // Je suis en mode de prétraitement :
+        // je dois sauver la liste des formes inconnues.
+        if (_lInc.isEmpty()) return;
+        QString nf = _repertoire + "/" + _nomFichier+"_inc.txt";
+        QFile v(nf);
+        v.open(QFile::WriteOnly);
+        for (int i = 0; i < _lInc.size(); i++)
+        {
+            QString toto = _lInc[i] + "\n\n";
+            v.write(toto.toUtf8());
+        }
+        return;
+    }
     if (nomFichier.isEmpty())
         nomFichier =
                 QFileDialog::getSaveFileName(this, "Sauvegarder le travail sous...",
                                              _repertoire + "/" + _nomFichier+".APN","APN Files (*.APN)");
     if (!nomFichier.isEmpty())
     {
-#ifdef VERIF
+        if (_lasla->sauver(nomFichier)) _changements = false;
+        else QMessageBox::about(
+                    this, tr("LASLA_tagger"),
+                    tr("Incapable de sauver le fichier !"));
+    }
+}
+
+/* La sauvegarde du fichier est passée dans Lasla.
+ *
+ * #ifdef VERIF
         QString nf = nomFichier;
         if (nomFichier.endsWith(".APN"))
             nf.replace(".APN",".ZPN");
@@ -983,8 +1294,10 @@ void MainWindow::sauver(QString nomFichier)
 #ifdef VERIF
             v.close();
 #endif
+
     }
 }
+*/
 
 /**
  * @brief MainWindow::plusFreq
@@ -1082,10 +1395,21 @@ QString MainWindow::tag(QString code9)
  */
 void MainWindow::choisir(int n, int id)
 {
+    if (_preProc && (id == 0))
+    {
+        QString lg = saisieCol(_lInc[n].section("\t", 0, 0));
+        // Je suis en mode préProcessing : je traite une forme inconnue.
+        qDebug() << lg;
+        // La procedure de saisie sauve ce qu'il faut dans le dico perso.
+        // Pour que ce soit immédiat, il faut ajouter la fiche LASLA
+        // ou le lemme Collatinus dans le module Lasla ou dans LemCore.
+        if (!lg.isEmpty()) _lasla->ajoute(lg);
+        return;
+    }
     _changements = true; // Dès que je passe ici, je peux supposer que quelque chose change.
     if (id == 0)
     {
-        if ((n>=0) && (n<_mots.size()))
+        if ((n>=0) && (n<_lasla->_mots.size()))
         {
             _numMot = n;
 //            qDebug() << n << _mots[n]->getFTexte() << _mots[n]->getChoix();
@@ -1110,7 +1434,7 @@ void MainWindow::choisir(int n, int id)
 //            aff.prepend("-3\tAjouter un mot après...");
             aff << "-4\tSupprimer ce mot...";
             aff0.prepend("-4\tSupprimer ce mot...");
-            QString m = _mots[n]->getFLem();
+            QString m = _lasla->_mots[n]->getFLem();
             if (m.contains(" "))
             {
                 aff << "-5\tSéparer le mot...";
@@ -1146,7 +1470,7 @@ void MainWindow::choisir(int n, int id)
 
             cursor.setBlockFormat(backgroundFormat);
             cursor.insertText("-9\tModifier la référence ",format);
-            cursor.insertText(_mots[_numMot]->getRef() + "\n",boldFormat);
+            cursor.insertText(_lasla->_mots[_numMot]->getRef() + "\n",boldFormat);
             cursor.insertText(aff0.join("\n"),format);
             // J'ai écrit le préambule sur fond gris clair.
             backgroundFormat.setBackground(QColor("white"));
@@ -1154,7 +1478,7 @@ void MainWindow::choisir(int n, int id)
             cursor.setBlockFormat(backgroundFormat);
             backgroundFormat.setLineHeight(120,QTextBlockFormat::ProportionalHeight);
 
-            for (int i = 0; i < _mots[n]->cnt(); i++)
+            for (int i = 0; i < _lasla->_mots[n]->cnt(); i++)
             {
                 if (backgroundFormat.background() == QColor(_couleur1))
                     backgroundFormat.setBackground(QColor(_couleur2));
@@ -1163,12 +1487,12 @@ void MainWindow::choisir(int n, int id)
                 cursor.insertBlock();
                 cursor.setBlockFormat(backgroundFormat);
 
-                if (i == _mots[n]->getChoix())
+                if (i == _lasla->_mots[n]->getChoix())
                 {
-                    cursor.insertText(num.arg(i) + _mots[n]->getInfo(i,false),boldFormat);
+                    cursor.insertText(num.arg(i) + _lasla->_mots[n]->getInfo(i,false),boldFormat);
                     cursor.setBlockFormat(choixFormat);
                 }
-                else cursor.insertText(num.arg(i) + _mots[n]->getInfo(i,false),format);
+                else cursor.insertText(num.arg(i) + _lasla->_mots[n]->getInfo(i,false),format);
             }
             backgroundFormat.setLineHeight(100,QTextBlockFormat::ProportionalHeight);
             backgroundFormat.setBackground(QColor("white"));
@@ -1179,7 +1503,7 @@ void MainWindow::choisir(int n, int id)
             cursor.setBlockFormat(backgroundFormat);
             cursor.insertText(aff.join("\n"),format);
             cursor.insertText("\n-9\tModifier la référence ",format);
-            cursor.insertText(_mots[_numMot]->getRef(),boldFormat);
+            cursor.insertText(_lasla->_mots[_numMot]->getRef(),boldFormat);
             // Et les commandes à la fin sur fond gris clair.
 
             _second->show();
@@ -1227,7 +1551,7 @@ void MainWindow::choisir(int n, int id)
         }
         else
         {
-            _mots[_numMot]->setChoix(n);
+            _lasla->_mots[_numMot]->setChoix(n);
         }
         _second->hide();
         afficher(); // Mettre à jour l'affichage de la phrase.
@@ -1251,7 +1575,7 @@ void MainWindow::choisir(int n, int id)
  * un chiffre, que je mets en séparateur.
  *
  */
-void MainWindow::grec()
+/*void MainWindow::grec()
 {
     if (_texte.contains(chiffres))
     {
@@ -1311,21 +1635,27 @@ void MainWindow::grec()
             }
         }
     }
-}
+}*/
 
 void MainWindow::creerNvlFiche()
 {
-    QString ligne = saisie(_mots[_numMot]->getFTexte());
+    QString m = _lasla->_mots[_numMot]->getFTexte();
+    QString ligne = saisie(m);
+    _lasla->ajoute(ligne, _numMot);
+    // Il faut changer toute le suite !
+/* Transférée dans Lasla::ajoute.
     Fiche * fiche = new Fiche(ligne);
     _fiches.insert(fiche->getClef(),fiche); // Pour les suivants
     // Il faut parcourir le texte pour ajouter cette analyse à tous les mots identiques.
-    for (int i = 0; i < _mots.size(); i++)
-        if (_mots[i]->getFTexte() == _mots[_numMot]->getFTexte())
-            _mots[i]->ajouteFiche(fiche);
-    _mots[_numMot]->setChoix(_mots[_numMot]->cnt() - 1);
+    for (int i = 0; i < _lasla->_mots.size(); i++)
+        if (_lasla->_mots[i]->getFTexte() == m)
+            _lasla->_mots[i]->ajouteFiche(fiche);
+    _lasla->_mots[_numMot]->setChoix(_lasla->_mots[_numMot]->cnt() - 1);
     // Pour le mot en cours d'examen, je valide cette dernière fiche.
+    */
 }
 
+/*
 void MainWindow::ajouterMot(QString m,int nm, QString r)
 {
     // J'analyse le mot m et je l'insère en position nm, avec la ref r.
@@ -1353,32 +1683,32 @@ void MainWindow::ajouterMot(QString m,int nm, QString r)
     if (_analyses.size()>1)
         qSort (_analyses.begin(), _analyses.end(), plusFreq);
     Mot *mm = new Mot(m,m,_analyses,-1,r);
-    _mots.insert(nm,mm);
+    _lasla->_mots.insert(nm,mm);
 //    decimer(nm,_finsPhrase[_numPhrase - 2],_finsPhrase[_numPhrase - 1] + 1);
     // Quand je sépare un mot, j'en ajoute deux et je ne dois décimer qu'à la fin.
-    for (int i=_numPhrase - 1; i < _finsPhrase.size(); i++)
-        _finsPhrase[i]++;
+    for (int i=_numPhrase - 1; i < _lasla->_finsPhrase.size(); i++)
+        _lasla->_finsPhrase[i]++;
 }
-
+*/
 void MainWindow::ajouterMotApres()
 {
     // Pour insérer un nouveau mot après le mot examiné.
-    QString r = _mots[_numMot]->getRef();
+    QString r = _lasla->_mots[_numMot]->getRef();
     ficForme2->clear();
     dMot->exec();
     QString m = ficForme2->text();
     if (!m.isEmpty())
     {
-        ajouterMot(m,_numMot + 1,r);
-        decimer(_numMot + 1,_finsPhrase[_numPhrase - 2],_finsPhrase[_numPhrase - 1]);
+        _lasla->ajouterMot(m,_numMot + 1, _numPhrase,r);
+        _lasla->decimer(_numMot + 1,_lasla->_finsPhrase[_numPhrase - 2],_lasla->_finsPhrase[_numPhrase - 1]);
     }
 }
 
 void MainWindow::ajouterMotAvant()
 {
     // Pour insérer un nouveau mot avant ou après le mot examiné.
-    QString r = _mots[_numMot]->getRef();
-    if (r.isEmpty()) r = _mots[_numMot - 1]->getRef();
+    QString r = _lasla->_mots[_numMot]->getRef();
+    if (r.isEmpty()) r = _lasla->_mots[_numMot - 1]->getRef();
     // Si le mot courant est un enclitique, il n'a pas de référence propre :
     // je vais chercher la référence du mot d'appui.
     ficForme2->clear();
@@ -1388,15 +1718,15 @@ void MainWindow::ajouterMotAvant()
     {
         if (QMessageBox::Yes == QMessageBox::question(this,"Avant ou après",
                                   "Voulez-vous insérer \n" + m + " AVANT "
-                                  + _mots[_numMot]->getFTexte() + " ?\n (non --> après)"))
+                                  + _lasla->_mots[_numMot]->getFTexte() + " ?\n (non --> après)"))
         {
-            ajouterMot(m,_numMot,r);
-            decimer(_numMot,_finsPhrase[_numPhrase - 2],_finsPhrase[_numPhrase - 1]);
+            _lasla->ajouterMot(m,_numMot, _numPhrase,r);
+            _lasla->decimer(_numMot,_lasla->_finsPhrase[_numPhrase - 2],_lasla->_finsPhrase[_numPhrase - 1]);
         }
         else
         {
-            ajouterMot(m,_numMot + 1,r);
-            decimer(_numMot + 1,_finsPhrase[_numPhrase - 2],_finsPhrase[_numPhrase - 1]);
+            _lasla->ajouterMot(m,_numMot + 1, _numPhrase,r);
+            _lasla->decimer(_numMot + 1,_lasla->_finsPhrase[_numPhrase - 2],_lasla->_finsPhrase[_numPhrase - 1]);
         }
     }
 }
@@ -1405,19 +1735,19 @@ void MainWindow::supprMot()
 {
     // Supprimer le mot courant
     if (QMessageBox::Yes == QMessageBox::question(this,"Confirmer la suppression",
-                              "Êtes-vous sûr de vouloir supprimer \n" + _mots[_numMot]->getFTexte() + " ?"))
+                              "Êtes-vous sûr de vouloir supprimer \n" + _lasla->_mots[_numMot]->getFTexte() + " ?"))
     {
-        _mots.removeAt(_numMot);
-        for (int i=_numPhrase - 1; i < _finsPhrase.size(); i++)
-            _finsPhrase[i]--;
+        _lasla->_mots.removeAt(_numMot);
+        for (int i=_numPhrase - 1; i < _lasla->_finsPhrase.size(); i++)
+            _lasla->_finsPhrase[i]--;
     }
 }
 
 void MainWindow::couperMot()
 {
     // Pour couper une forme en plusieurs mots
-    QString m = _mots[_numMot]->formeFiche();
-    QString r = _mots[_numMot]->getRef();
+    QString m = _lasla->_mots[_numMot]->formeFiche();
+    QString r = _lasla->_mots[_numMot]->getRef();
     supprMot();
     QStringList ecl = m.split(" ");
     int j = 0;
@@ -1426,7 +1756,7 @@ void MainWindow::couperMot()
         {
             ecl[i].remove('<');
             ecl[i].remove('>');
-            ajouterMot(ecl[i],_numMot + j,r);
+            _lasla->ajouterMot(ecl[i],_numMot + j, _numPhrase,r);
             j++;
         }
     j = 0;
@@ -1434,14 +1764,15 @@ void MainWindow::couperMot()
         if (!ecl[i].startsWith("<") || !ecl[i].endsWith(">"))
         {
             // Je ne dois décimer les analyses qu'après avoir ajouté tous les mots.
-            decimer(_numMot + j,_finsPhrase[_numPhrase - 2],_finsPhrase[_numPhrase - 1]);
+            _lasla->decimer(_numMot + j,_lasla->_finsPhrase[_numPhrase - 2],_lasla->_finsPhrase[_numPhrase - 1]);
             j++;
         }
 }
 
 void MainWindow::separeEncli()
 {
-    QString m = _mots[_numMot]->getFTexte();
+    _lasla->separEncl(_numMot, _numPhrase);
+/*    QString m = _mots[_numMot]->getFTexte();
     QList<Fiche*> analyses;
     if (m.endsWith("que") || m.endsWith("cum"))
     {
@@ -1481,10 +1812,10 @@ void MainWindow::separeEncli()
         decimer(_numMot,_finsPhrase[_numPhrase - 2],_finsPhrase[_numPhrase - 1] + 1);
         for (int i=0; i < _finsPhrase.size(); i++)
             if (_finsPhrase[i] > _numMot) _finsPhrase[i]++;
-    }
+    } */
 }
 
-void MainWindow::decimer(int i, int debPhr, int finPhr)
+/*void MainWindow::decimer(int i, int debPhr, int finPhr)
 {
     QStringList mr = _mots[i]->motsRequis();
 //    if (_mots[i]->getFTexte() == "ante")
@@ -1558,13 +1889,13 @@ void MainWindow::decimer(int i, int debPhr, int finPhr)
         }
     }
 
-}
+} */
 
 void MainWindow::changerRef()
 {
     // Pour modifier la référence du mot
     QString m = "";
-    QString r = _mots[_numMot]->getRef();
+    QString r = _lasla->_mots[_numMot]->getRef();
     if (!r.isEmpty())
     {
         // Pour les enclitiques, la ref est vide et doit le rester.
@@ -1573,7 +1904,8 @@ void MainWindow::changerRef()
         m = ficForme3->text();
     }
     // Pour bien faire, il faudrait vérifier que le format est bon...
-    if (!m.isEmpty() && (m != r) && (m.count('/') > 0))
+    _lasla->changerRef(_numMot, _numPhrase, m); // m est la nouvelle ref.
+/*    if (!m.isEmpty() && (m != r) && (m.count('/') > 0))
     {
         // r est l'ancienne ref et m est la nouvelle
         if (r.section("/",0,0) != m.section("/",0,0))
@@ -1695,12 +2027,12 @@ void MainWindow::changerRef()
             // Je suis sûr qu'il est sur 3 caractères
         }
         _mots[_numMot]->setRef(m);
-    }
+    } */
 }
 
 void MainWindow::fusionPhrase()
 {
-    // Je supprime une phrase
+/*    // Je supprime une phrase
     // Renuméroter les ref.
     for (int i = _finsPhrase[_numPhrase - 1]; i < _mots.size(); i++)
         if (!_mots[i]->getRef().isEmpty())
@@ -1712,10 +2044,11 @@ void MainWindow::fusionPhrase()
     }
     _finsPhrase.removeAt(_numPhrase - 1);
     if (!_fPhrEl.isEmpty())
-        _fPhrEl.removeAt(_numPhrase - 1);
+        _fPhrEl.removeAt(_numPhrase - 1); */
+    _lasla->fusionPhrase(_numPhrase);
     afficher();
 }
-
+/*
 void MainWindow::taggage()
 {
     QString nomFichier = _repertoire + "/" + _nomFichier+".log";
@@ -1823,7 +2156,7 @@ void MainWindow::taggage()
                 nvlProba.append(probabilites[j] * pr[k] / prTot);
                 // Si j'avais gardé toutes les séquences, ce serait une vraie probabilité (normalisée à 1)
             }*/
-        }
+/*        }
         // J'ai toutes les séquences de tags en tenant compte du mot n° i.
         if (iMoins2 == i - 2)
         {
@@ -1916,7 +2249,7 @@ void MainWindow::taggage()
                     aff << "";
                 }
                 */
-                _pointsFixes << i;
+/*                _pointsFixes << i;
             }
             double pr = probabilites[0];
             double br = branches;
@@ -2028,13 +2361,14 @@ void MainWindow::taggage()
     }
     progr.setValue(progr.maximum()+1);
 }
-
+*/
 /**
  * @brief MainWindow::retag
  * @param bigr : le bigramme terminal
  * @param iFixe : l'indice du mot qui donne le point fixe
  * @return la séquence obtenue à rebours
  */
+/*
 double MainWindow::retag(QString * bitag, int iFixe)
 {
     QStringList sequences;
@@ -2174,7 +2508,8 @@ double MainWindow::retag(QString * bitag, int iFixe)
     double score = (pMax - pPrime) / (pPrime + pMax);
     return score;
 }
-
+*/
+/*
 QList<Fiche*> MainWindow::appelCollatinus(QString m, bool* enclit)
 {
     QList<Fiche*> analyses;
@@ -2200,7 +2535,7 @@ QList<Fiche*> MainWindow::appelCollatinus(QString m, bool* enclit)
     tcpSocket->disconnectFromHost();
     tcpSocket->close();
     QString rep(ba);
-    */
+    */ /*
     QString rep = _lasla->k9(m);
     if (rep.size() > 1)
     {
@@ -2320,18 +2655,4 @@ QList<Fiche*> MainWindow::appelCollatinus(QString m, bool* enclit)
     }
     return analyses;
 }
-
-QList<Fiche*> MainWindow::getAnalyses(QString forme)
-{
-    QList<Fiche*> analyses;
-    QString cle = Fiche::clef(forme);
-    if (cle.contains("/") && !cle.startsWith("$"))
-    {
-        // Clef ambiguë
-        analyses = _fiches.values(cle.section("/",0,0));
-        analyses.append(_fiches.values(cle.section("/",1,1)));
-        // Je prends les deux valeurs possibles.
-    }
-    else analyses = _fiches.values(cle);
-    return analyses;
-}
+*/

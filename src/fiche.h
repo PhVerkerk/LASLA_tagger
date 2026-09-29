@@ -2,8 +2,9 @@
 #define FICHE_H
 
 #include <QString>
+#include <QDebug>
 #include <QStringList>
-#include <QtWidgets>
+// #include <QtWidgets>
 
 /**
  * @brief The Fiche class represents a line of data
@@ -78,12 +79,16 @@ public:
     QString getLemme ();
     QString getIndice ();
     QString getCode ();
+    QString getGenre();
+    void setGenre(QString genre);
     int getNbr ();
     QString getClef();
     QString getCmpl();
     QString getTag();
+    QString getLigne();
     QString info();
     QString Lasla(QString ref);
+    QString CSV();
     QString humain();
     QStringList static const cats ;
     QStringList static const cass ;
@@ -93,6 +98,9 @@ public:
     QStringList static const modes ;
     QStringList static const voixs ;
     QStringList static const tempss ;
+    QStringList static semidep ;
+    // La liste des lemmes connus au LASLA comme semideponents.
+//    bool static estSemidep();
     QString static clef(QString ff);
     // Pour la forme donnée par la fiche, je dois calculer
     // la forme du texte qui déclenche cette analyse.
@@ -105,6 +113,7 @@ public:
     void setClef(QString c);
     void setCmpl(QString c);
     bool estCondit();
+    bool egale(Fiche *fiche);
 
 private:
     QString _forme;
@@ -112,10 +121,13 @@ private:
     QString _indice;
     QString _code;
     QString _tag;
+    QString _genre;
     int _nbr;
     QString _clef;
     QString _cmpl;
     bool _jointe;
+    QString _ligne;
+    QString static const _nombre;
 };
 
 #endif // FICHE_H
