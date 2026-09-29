@@ -11,7 +11,8 @@ The code is written in C++ using the Qt libraries.
 The free installation of Qt (https://www.qt.io/download-open-source)
 is sufficient. I recommend the use of QtCreator.
 This code has been successfully deployed on Mac (OS 10.13.6)
-and Windows 10 and 11. 
+and Windows 10 and 11. But the AI part,
+does not work on Mac.
 It should work also on Linux, provided that a version
 of Qt is available for the target system.
 
@@ -38,3 +39,8 @@ Published description of the tagger :
     Dominique Longrée
 **in** Studi e Saggi Linguistici, V. 58 N. 1 (2020)
 https://www.studiesaggilinguistici.it/index.php/ssl/article/view/275
+
+For the use of AI in the tagger, see :
+*Elaboration of a practical lemmatiser for Latin using Artificial Intelligence* ;
+    Philippe Verkerk
+**in** Archivum Latinitatis Medii Aevi **80**, p. 267 (2022-2023)
