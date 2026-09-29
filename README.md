@@ -7,14 +7,14 @@ This version 3 uses AI models to predict with a
 higher precision the tag, the index of the lemma
 and the subordination code.
 
-The code is written in C++ using the Qt libraries.
+The code is written in C++ using the Qt5 libraries.
 The free installation of Qt (https://www.qt.io/download-open-source)
 is sufficient. I recommend the use of QtCreator.
 This code has been successfully deployed on Mac (OS 10.13.6)
-and Windows 10 and 11. But the AI part,
-does not work on Mac.
+and Windows 10 and 11. But the AI part
+**does not work** on Mac.
 It should work also on Linux, provided that a version
-of Qt is available for the target system.
+of Qt5 is available for the target system.
 
 ## Description
 Ce programme associe une double lemmatisation et
