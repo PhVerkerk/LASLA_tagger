@@ -1,0 +1,51 @@
+!                          medieval.txt
+!
+!This file is part of COLLATINUS.
+!COLLATINUS is free software; you can redistribute it and/or modify
+!it under the terms of the GNU General Public License as published by
+!the Free Software Foundation; either version 2 of the License, or
+!(at your option) any later version.
+!
+!COLLATINUS is distributed in the hope that it will be useful,
+!but WITHOUT ANY WARRANTY; without even the implied warranty of
+!MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!GNU General Public License for more details.
+!
+!You should have received a copy of the GNU General Public License
+!along with COLLATINUS; if not, write to the Free Software
+!Foundation, Inc., 59 Temple Place, Suite 3inv, Boston, MA  02111-1307  USA
+! (c) © Yves Ouvrard, 2011 - 2016
+!
+! Le rôle de ce fichier est de donner un ensemble de règles
+! pour "transformer" le latin classique en un sabir de latin médiéval.
+! L'idée est de faire subir la même transformation aux formes du texte
+! et aux radicaux et désinences.
+! Ainsi, rien ne change au niveau de la décomposition.
+! Cela n'évitera pas l'ajout de mots nouveaux, en particulier ceux
+! qui viennent des langues vernaculaires.
+!
+! Il agit sur les formes sans quantité et déramisées :
+! il faudra faire attention au "u".
+!
+! Philippe, septembre 2017.
+!
+ae;e
+oe;e
+ȩ;e
+! Les diphtongues ae et oe deviennent e
+y;i
+ph;f
+k;c
+michi;mihi
+nichil;nihil
+mpn;mn
+! Les paires y/i et ph/f sont interchangeables, je les remplace par le plus simple.
+h;
+! Le h peut disparaître ou apparaître : je le supprime.
+ti([aeio]|u[^aeiou]);ci\1
+! ti+voyelle devient ci+voyelle. Il faudrait faire attention au "u" qui serait un "v"
+! et au ti en fin de radical qui sont devant la première voyelle de la désinence.
+ti$;ci*
+!
+! Il faudra sans doute ajouter d'autres règles…
+!

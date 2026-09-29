@@ -1,0 +1,60 @@
+!               lem_pers.fr
+!Français
+! Version 0 : 2025/02/25
+! Dico perso
+Ammonius:Ammonios, favori d'Alexandre Balas
+!2025-03-12T16:02:19
+! /Users/domi/Desktop/File per il taguer/Florus_Epitoma_de_Tito_Liuio3.txt
+Poppaedius:Popaedius,  chef italique
+Lamponius:chef des Samnites
+Lasthenes:chef de Cydonia
+!2025-03-13T10:44:44
+! /Users/domi/Desktop/File per il taguer/Florus_Epitoma_de_Tito_Liuio3.txt
+Artoces:roi d'Iberie
+Brittomarus:chef des Gaulois Insubres
+!2025-03-13T11:34:50
+! /Users/domi/Desktop/File per il taguer/Florus_Epitoma_de_Tito_Liuio3.txt
+Lasthenes:chef de Cydonia
+Panares:chef de Cydonia
+!2025-03-14T11:04:52
+! /Users/domi/Desktop/File per il taguer/Florus_Epitoma_de_Tito_Liuio3.txt
+Casuellanus:roi des Calédoniens
+Silaces:préfet des Parthes
+Turmogi:peuple de la Tearraconnaise
+Uarenianus:relatif à Varenus
+Hirtuleius:légat de Sertorius en Espagne
+Polyxenidas:préfet de la flotte d'Antiochos
+
+Bitocus:soldat gaulois
+!2025-03-14T15:54:24
+! /Users/domi/Desktop/File per il taguer/T_Livi_Periochae3.txt
+Gisia:ville d'Espagne
+Congonnetiacus:homme d'origine celtique
+!2025-03-17T09:54:39
+! /Users/domi/Desktop/File per il taguer/T_Livi_Periochae3.txt
+Tremellius:nom d'un homme
+Gannicus:commandant d'origine germanique
+!2025-03-17T10:15:14
+! /Users/domi/Desktop/File per il taguer/T_Livi_Periochae3.txt
+Hierius:nom d'un homme
+!2025-03-17T10:51:19
+! /Users/domi/Desktop/File per il taguer/T_Livi_Periochae3.txt
+Opillia:nom d'une vestale
+Olonicus:nom d'un homme
+!2025-03-17T11:04:33
+! /Users/domi/Desktop/File per il taguer/T_Livi_Periochae3.txt
+Bastia:femme de Papien Mutilus
+Caesetius:Flavius,  tribun de la plèbe
+Chumstinctus:nom d'un homme
+!2025-03-17T11:40:29
+! /Users/domi/Desktop/File per il taguer/T_Livi_Periochae3.txt
+Glicia:nom d'une famille romaine
+Gymnesius:nom d'origine grecque
+Indebilis:homme d'Espagne
+Nunnius:nom d'un homme
+Orfitianus:nom de famille romain
+!2025-03-17T12:18:40
+! /Users/domi/Desktop/File per il taguer/T_Livi_Periochae3.txt
+Balius:nom d'origine grecque
+Saluidenus:homme cher à Octavien
+
