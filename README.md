@@ -1,7 +1,11 @@
 # LASLA_tagger
-Code and data for a HMM3 tagger (version 2) 
+In this branch, I have implemented an up-grade
+of the previous HMM3 tagger (version 2) 
 that transforms plain text files into APN-files 
 (standard annotated files from the LASLA in Liège).
+This version 3 uses AI models to predict with a
+higher precision the tag, the index of the lemma
+and the subordination code.
 
 The code is written in C++ using the Qt libraries.
 The free installation of Qt (https://www.qt.io/download-open-source)
